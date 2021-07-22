@@ -37,6 +37,7 @@ ll_wgps %>%
 ggplot(aes(x = diag_year, y = value, fill = `With onset`)) +
   geom_col() +
   labs(x = "Year of diagnosis", y = "Proportion") -> prop_wonset
+prop_wonset
 
 ggsave(here::here(figdir,"vl_gps_withonset_byyear.png"),
        prop_wonset,
@@ -55,9 +56,9 @@ ggmap(bh_lines, base_layer = ggplot(arrange(ll_filt,OD_missing), aes(x = longitu
   geom_jitter(alpha = 0.8) +
   scale_colour_manual(values = c("grey","indianred")) +
   labs(x = "", y = "", col = "Missing onset", caption = "Diagnoses between 2016 and 2019") -> map_missOD
+map_missOD
 
 ggsave(here::here(figdir, "village_missOD.png"), map_missOD, height = 7, width = 10, units = "in")
-
 
 ################################################################################
 # Observed delays by year
@@ -78,8 +79,8 @@ by_yr %>%
   geom_line(aes(y = mean), col = "steelblue", lty = "dashed", lwd = 1.2) +
   scale_y_continuous(trans = "log2") +
   labs(x = "Year of diagnosis", y = "Onset to diagnosis (days)") -> OD_byyear
-
 OD_byyear
+
 ggsave(here::here(figdir,"OD_byyear.png"),
        OD_byyear,
        height = 4, width = 6, units = "in")
@@ -89,7 +90,13 @@ ll_wgps %>%
   ggplot(aes(x = days_fever)) +
   geom_histogram(bins = 50) +
   xlim(c(0,365)) +
-  labs(x = "Onset to diagnosis (days)", y = "Frequency")
+  labs(x = "Onset to diagnosis (days)", y = "Frequency") -> OD_hist
+OD_hist
+
+ggsave(here::here(figdir,"OD_hist.png"),
+       OD_hist,
+       height = 4, width = 6, units = "in")
+
 
 pal <- c("grey",viridis::viridis(3, end = 0.8, direction = -1))
 ll_wgps %>%
@@ -105,12 +112,11 @@ ll_wgps %>%
   geom_col() +
   scale_fill_manual(values = pal) +
   labs(x = "Year of diagnosis", y = "Proportion") -> prop_gt90days
-
 prop_gt90days
+
 ggsave(here::here(figdir,"prop_excessive_byyear.png"),
        prop_gt90days,
        height = 4, width = 6, units = "in")
-
 
 ################################################################################
 # Observed delays by location
@@ -136,6 +142,7 @@ ggmap(bh_lines, base_layer = ggplot(ll_filt, aes(x = longitude, y = latitude, co
   geom_jitter(alpha = 0.5) +
   scale_colour_viridis_d(option = "viridis", na.value = "grey", direction = -1, end = 0.9) +
   labs(x = "", y = "", col = "Delay") -> map_cat5
+map_cat5
 
 ggsave(here::here(figdir, "village_OD_cat5.png"), map_cat5, height = 7, width = 10, units = "in")
 
