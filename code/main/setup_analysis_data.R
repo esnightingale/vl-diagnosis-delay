@@ -37,9 +37,21 @@ coordinates(dat.spdf) <- ~ longitude + latitude
 dat$traveltime <- raster::extract(access.raster, dat.spdf)
 
 # ---------------------------------------------------------------------------- #
-# Save analysis dataset
+# Aggregate to village level
 
-saveRDS(dat, here::here("data","analysisdata.rds"))
+dat %>%
+  group_by(latitude, longitude, dist_cdf, block_cdf, vill_cdf, vil_code, population,
+           IRS_2017, block_endm_2017, traveltime, diag_year_cdf) %>%
+  summarise(n_cases = n(),
+            gt90 = sum(gt90_cdf),
+            gt30 = sum(gt30_cdf)) -> dat_village
+
+# ---------------------------------------------------------------------------- #
+# Save analysis datasets
+
+saveRDS(dat, here::here("data","analysisdata_individual.rds"))
+
+saveRDS(dat_village, here::here("data","analysisdata_village.rds"))
 
 ################################################################################
 ################################################################################
