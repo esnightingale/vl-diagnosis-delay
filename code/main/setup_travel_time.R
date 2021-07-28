@@ -107,6 +107,24 @@ ggsave(here::here("figures","covariates","traveltime_wfacilities.png"), full_plo
 # Save raster of travel time to facility
 raster::writeRaster(access.raster, here::here("data","covariates","diag_facility_travel_time.tif"), overwrite = TRUE)
 
+# Convert to data.frame
+access.pts <- raster::rasterToPoints(access.raster, spatial = TRUE)
+access.df  <- data.frame(access.pts)
+
+saveRDS(access.df, here::here("data","covariates","diag_facility_travel_time.rds"))
+
+ggplot() +
+  geom_raster(data = access.df, aes(x = x, y = y, fill = diag_facility_travel_time)) +
+  scale_fill_viridis_c(trans = "sqrt") +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        panel.border = element_rect(fill = NA, colour = "white"),
+        panel.background = element_rect(fill = "white", colour = "white")) +
+  labs(x = "", y = "", 
+       title = "Travel time to most accessible health facility",
+       fill = "Minutes \nof travel")
+
+
 # ---------------------------------------------------------------------------- #
 
 villages <- filter(match, !is.na(longitude))
