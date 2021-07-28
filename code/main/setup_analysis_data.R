@@ -10,6 +10,8 @@ dat <- readRDS(here::here("data","kamis_cdf.rds")) %>%
                 gt30_cdf, gt90_cdf, poss_acd) %>%
   dplyr::mutate(poss_acd = (poss_acd == 1))
   
+names(dat) <- gsub("_cdf", "",names(dat))
+  
   # dplyr::mutate(marg_caste_kamis = (caste_category %in% c("SC","ST"))) %>%
   # dplyr::select(c(country:patient_id, ends_with("_kamis"), `treated_for_kala-azar_earlier`,
   #               caste_category, special_caste, basis_of_diagnosis,
@@ -127,12 +129,12 @@ ggsave(here::here("figures", "covariates", "traveltime_hist.png"), height = 6, w
 dat_wchars %>%
   group_by(district, block, village, vil_code, population,
            vl_affected_village, IRS_2017, block_endm_2017, traveltime, 
-           diag_year_cdf, diag_month_cdf) %>%
+           diag_year, diag_month) %>%
   summarise(n_cases = n(),
             n_acd = sum(poss_acd),
             p_acd = n_acd/n_cases,
-            gt90 = sum(gt90_cdf),
-            gt30 = sum(gt30_cdf)) -> dat_village
+            gt90 = sum(gt90),
+            gt30 = sum(gt30)) -> dat_village
 
 # ---------------------------------------------------------------------------- #
 # Save analysis datasets
