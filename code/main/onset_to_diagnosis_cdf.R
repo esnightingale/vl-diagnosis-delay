@@ -7,12 +7,13 @@
 figdir <- "figures/CDF"
 
 # Load merged KAMIS/GPS/CDF data 
-match <- readRDS(here::here("data","kamis_cdf.rds"))
+match <- readRDS(here::here("data","kamis_cdf.rds")) %>%
+  dplyr::filter(with_gps) 
 
 # Setup map context
 blockmap <- readRDS(here::here("data","bihar_block.rds"))
 
-centre <- c(lon = mean(ll_wgps$longitude), lat = mean(ll_wgps$latitude))
+# centre <- c(lon = mean(match$longitude), lat = mean(match$latitude))
 extent <- setNames(st_bbox(blockmap), c("left","bottom","right","top"))
 bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
 
@@ -80,7 +81,6 @@ ggsave(here::here(figdir,"prop_excessive_bymth.png"),
        prop_excessive,
        height = 4, width = 6, units = "in")
 
-
 ################################################################################
 # Observed delays by location
 
@@ -92,9 +92,17 @@ match <- match %>%
   arrange(days_fever_cdf)
 
 summary(match$days_fever_cdf)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 4.00   25.00   30.00   45.01   58.00  510.00 
 summary(match$ODcat5)
+# [0,15]   (15,30]   (30,90]  (90,180] (180,730] 
+# 198      2284      1607       251        54 
 summary(match$ODcat3)
+# [0,30]  (30,90] (90,730] 
+# 2482     1607      305 
 summary(match$ODexcess)
+# FALSE    TRUE 
+# 4089     305
 
 # ---------------------------------------------------------------------------- #
 # Individuals
@@ -133,6 +141,7 @@ ggmap(bh_lines,
   geom_jitter(alpha = 0.8) +
   scale_colour_viridis_d(option = "viridis", na.value = "grey", direction = -1, end = 0.9) +
   labs(x = "", y = "", col = "Delay") -> map_cat3
+map_cat3
 
 ggsave(here::here(figdir, "village_OD_cat3.png"), 
        map_cat3, 
@@ -145,12 +154,12 @@ ggmap(bh_lines,
                           aes(x = longitude, y = latitude, col = gt90_cdf))) +
   geom_jitter(alpha = 0.8) +
   scale_colour_manual(values = c("grey","indianred")) +
-  labs(x = "", y = "", col = "Delay > 90 days", subtitle = "Diagnoses between 2016 and 2018") -> map_excess
+  labs(x = "", y = "", col = "Delay > 90 days", subtitle = "Diagnoses between Jan 2018 - July 2019") -> map_excess
+map_excess
 
 ggsave(here::here(figdir, "village_OD_excess.png"), 
        map_excess, 
        height = 7, width = 10, units = "in")
-
 
 # ---------------------------------------------------------------------------- #
 # By village
@@ -174,8 +183,8 @@ ggmap(bh_lines,
   scale_colour_viridis_c(option = "viridis", na.value = "grey", direction = -1, trans = "log2", end = 0.9) +
   scale_alpha_continuous(trans = "log10") +
   labs(x = "", y = "", col = "Median delay") -> map_medOD
-
 map_medOD
+
 ggsave(here::here(figdir, "village_medianOD.png"), 
        map_medOD, 
        height = 7, width = 10, units = "in")
@@ -218,8 +227,8 @@ match %>%
   group_by(district, block) %>%
   summarise(N = n(),
             medianOD = median(days_fever_cdf, na.rm = T),
-            propgt90 = mean(gt90_cdf, na.rm = T)*100,
-            propgt30 = mean(gt30_cdf, na.rm = T)*100) %>%
+            pgt90 = mean(gt90_cdf, na.rm = T)*100,
+            pgt30 = mean(gt30_cdf, na.rm = T)*100) %>%
   mutate(ODcat3 = cut(medianOD, c(0,15,90,730), include.lowest = TRUE, ordered_result = TRUE)) %>%
   ungroup() -> by_block
 
@@ -237,78 +246,67 @@ ggplot() +
   scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, trans = "log2", end = 0.9) +
   labs(fill = "Median delay") + 
   theme(axis.text = element_blank()) -> blk_medOD
-
 blk_medOD
+
 ggsave(here::here(figdir, "block_medianOD.png"), blk_medOD, height = 7, width = 10, units = "in")
 
 ggplot() +
   geom_sf(data = blockmap) +
-  geom_sf(data = by_block, aes(geometry = geometry, fill = propgt30)) +
+  geom_sf(data = by_block, aes(geometry = geometry, fill = pgt30)) +
   scale_fill_viridis_c(option = "magma", na.value = "white", direction = -1, end = 0.8) +
   labs(fill = "% > 30 days") + 
-  theme(axis.text = element_blank()) -> blk_propgt30
+  theme(axis.text = element_blank()) -> blk_pgt30
+blk_pgt30
 
-blk_propgt30
-ggsave(here::here(figdir, "block_propgt30.png"), blk_propgt30, height = 7, width = 10, units = "in")
+ggsave(here::here(figdir, "block_propgt30.png"), blk_pgt30, height = 7, width = 10, units = "in")
 
 
 ggplot() +
   geom_sf(data = blockmap) +
-  geom_sf(data = by_block, aes(geometry = geometry, fill = propgt90)) +
+  geom_sf(data = by_block, aes(geometry = geometry, fill = pgt90)) +
   scale_fill_viridis_c(option = "magma", na.value = "white", direction = -1, end = 0.9) +
   labs(fill = "% > 90 days") +
-  theme(axis.text = element_blank()) -> blk_propgt90
+  theme(axis.text = element_blank()) -> blk_pgt90
+blk_pgt90
 
-blk_propgt90
-ggsave(here::here(figdir, "block_propgt90.png"), blk_propgt90, height = 7, width = 10, units = "in")
+ggsave(here::here(figdir, "block_propgt90.png"), blk_pgt90, height = 7, width = 10, units = "in")
 
 # Join two block maps
-combined <- blk_medOD + blk_propgt30 +
-  plot_annotation(caption = paste0("Diagnoses between ",
-                                   range(match$Date_Diag)[1],
+combined <- blk_pgt30 + blk_pgt90 +
+  plot_annotation(title = "Proportion of cases diagnosed with excess delays",
+                  caption = paste0("Diagnoses between ",
+                                   range(match$diag_date_cdf)[1],
                                    " and ",
-                                   range(match$Date_Diag)[2]))
-ggsave(here::here(figdir, "OD_by_block.png"), combined, height = 7, width = 14, units = "in")
+                                   range(match$diag_date_cdf)[2]))
+combined
+
+ggsave(here::here(figdir, "excess_delay_byblock.png"), combined, height = 7, width = 14, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # Bivariate map of delay and incidence
 
 by_block %>%
-  filter(!is.na(propgt30)) %>%
+  filter(!is.na(pgt30)) %>%
   mutate(inc = replace_na(inc, 0)) -> plotdat
-plotdat <- bi_class(plotdat, x = propgt30, y = inc, style = "fisher", dim = 3) 
 
-ggplot() +
-  geom_sf(data = blockmap, fill = "white") +
-  geom_sf(data = plotdat, aes(fill = bi_class), show.legend = FALSE) +
-  bi_scale_fill(pal = "DkBlue", dim = 3, na.value = "white") +
-  bi_theme() -> biv_map
+bv <- create_bivmap(blockmap, plotdat,
+                   xvar = "pgt30", yvar = "inc",
+                   xlab = "% > 30 days", ylab = "Cases/10,000",
+                   pal = "DkBlue")
+bv
 
-legend <- bi_legend(pal = "DkBlue",
-                    dim = 3,
-                    xlab = "% > 30 days",
-                    ylab = "Cases/10,000",
-                    size = 10)
-
-final <- cowplot::ggdraw() +
-  cowplot::draw_plot(biv_map, 0, 0, 1, 1) +
-  cowplot::draw_plot(legend, 0.6, 0.7, 0.3, 0.3)
-final
-
-ggsave(here::here(figdir, "block_propgt30_byinc_bv.png"), final, height = 7, width = 10, units = "in")
-
-
-
+ggsave(here::here(figdir, "block_propgt30_byinc_bv.png"), bv, height = 7, width = 10, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # Semi-variogram
 
-dat <- filter(match, !is.na(longitude) & !is.na(DUR_FEV_R))
+dat <- filter(match, !is.na(longitude) & !is.na(days_fever_cdf))
 
 # convert simple data frame into a spatial data frame object
 coordinates(dat) <- ~ longitude + latitude
+crs(dat) <- "+proj=longlat +datum=WGS84 +units=km +no_defs"
 
-vg <- variogram(DUR_FEV_R~1, data = dat)
+vg <- variogram(days_fever_cdf~1, data = dat)
 plot(vg)
 
 vgmod <- vgm(psill =  800, model = "Mat", nugget = 1000, range = 0.5)
