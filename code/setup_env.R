@@ -9,7 +9,8 @@
 
 # Packages required
 packages <- c("tidyverse","lubridate","sf","spdep","rgdal","ggspatial",
-              "ggmap","patchwork","scales","here", "gstat", "biscale")
+              "ggmap","patchwork","scales","here", "gstat", "biscale",
+              "INLA","inlabru","mapr")
 
 # Check and install if necessary
 installed_packages <- packages %in% rownames(installed.packages())

@@ -18,7 +18,7 @@ figdir <- "figures/fit"
 
 dat <- readRDS(here::here("data","analysisdata_individual.rds")) %>%
   st_set_crs(4326) %>%
-  mutate(excess_delay = as.numeric(gt30))
+  mutate(excess_delay = as.numeric(gt90_cdf))
 # 
 # dat.spdf <- dat
 # coordinates(dat.spdf) <- ~ longitude + latitude
@@ -90,6 +90,9 @@ A <- inla.spde.make.A(mesh = mesh, loc = coo)
 dim(A)
 nrow(dat)
 
+# Repeat for nugget/IID effect
+A2 <- inla.spde.make.A(mesh = mesh, loc = coo)
+
 #------------------------------------------------------------------------------#
 
 # Define a grid of points at which to make predictions. 
@@ -115,8 +118,6 @@ Ap <- inla.spde.make.A(mesh = mesh, loc = coop)
 
 #------------------------------------------------------------------------------#
 
-
-
 # Organise the data, projection matrices and fixed/random effects into a "stack".
 # Need separate ones for estimation at observed locations and prediction across
 # defined grid
@@ -132,8 +133,8 @@ Ap <- inla.spde.make.A(mesh = mesh, loc = coop)
 # stack for estimation stk.e
 stk.e <- inla.stack(
   tag = "est", 
-  data = list(y = dat$excess_delay),
-  A = list(1, 1, A),
+  data = list(y = dat$days_fever),
+  A = list(1, A),
   effects = list(data.frame(b0 = rep(1, nrow(coo))), s = indexs)
 )
 
@@ -151,14 +152,14 @@ stk.full <- inla.stack(stk.e, stk.p)
 #------------------------------------------------------------------------------#
 
 # Model formula
-formula <- y ~ 0 + b0 + f(s, model = spde) # + f(s2, model = "iid") # w/ nugget effect
+formula <- y ~ 0 + b0 + f(s, model = spde) #+ f(s2, model = "iid") # w/ nugget effect
 
 #------------------------------------------------------------------------------#
 
 # Fitting
 res <- inla(formula,
-            family = "binomial",
-            control.family = list(link = "logit"),
+            family = "nbinomial",
+            # control.family = list(link = "log"),
             data = inla.stack.data(stk.full),
             control.predictor = list(
               compute = TRUE, link = 1,
@@ -170,7 +171,9 @@ summary(res)
 
 autoplot(res)
 
-saveRDS(res,here::here("output","fit_base_bin30.rds"))
+INLAutils::ggplot_inla_residuals(res, dat$days_fever)
+
+saveRDS(res,here::here("output","fit_base_nb.rds"))
 
 #------------------------------------------------------------------------------#
 
@@ -181,51 +184,48 @@ saveRDS(res,here::here("output","fit_base_bin30.rds"))
 index <- inla.stack.index(stack = stk.full, tag = "pred")$data
 
 # Extract summary stats of fitted values at these indices
-mean <- res$summary.fitted.values[index, "mean"]
+med <- res$summary.fitted.values[index, "0.5quant"]
 ll <- res$summary.fitted.values[index, "0.025quant"]
 ul <- res$summary.fitted.values[index, "0.975quant"]
 
-pred <- data.frame(x = coop[,1], y = coop[,2], mean = mean, ll = ll, ul = ul)#, iqr = ul - ll
-
-pred.long <- pred %>%
- tidyr::pivot_longer(-x:-y)
+pred <- data.frame(x = coop[,1], y = coop[,2], med = med, ll = ll, ul = ul, iqr = ul - ll) 
+# %>%
+#   tidyr::pivot_longer(-x:-y)
 
 ggmap(bh_lines, 
-      base_layer = ggplot(data = pred.long,
-                          aes(x = x, y = y, fill = value))) +  #, alpha = 1/iqr
+      base_layer = ggplot(data = pred,
+                          aes(x = x, y = y, fill = med))) + # , alpha = 1/iqr
   geom_tile() +
-  facet_wrap(~name) +
   # scale_alpha_continuous(trans = "log10") +
   scale_fill_viridis_c(direction = -1, option = "plasma") + #trans = "log10", 
-  labs(x = "", y = "", fill = "Mean", alpha = "1/IQR",
-       title = "Fitted mean and 2.5-97.5 quantiles for the risk of delay greater than 30 days") +
-  coord_fixed(ratio = 1) 
+  # scale_fill_gradient2(midpoint = mean(dat$days_fever), trans = "log2") +
+  labs(x = "", y = "", fill = "Median", alpha = "1/IQR") +
+  coord_fixed(ratio = 1)
 
-ggsave(here::here(figdir,"base_fit_bin30.png"), height = 4, width = 12, units = "in")
+ggsave(here::here(figdir,"base_fit_nb.png"), height = 6, width = 9, units = "in")
 
 #------------------------------------------------------------------------------#
-# 
-# # Define a raster of these values to plot
-# r_mean <- raster::rasterize(
-#   x = coop, y = access, field = mean, 
-# )
-# 
-# ggmap(bh_lines, 
-#       base_layer = ggplot(data = r_mean, aes(x = x, y = y, fill = fct_elevation_2))) +
-#   geom_raster() +
-#   labs(x = "", y = "", col = "Mean") 
-# 
-# 
-# pal <- colorNumeric("viridis", c(0,530), na.color = "transparent")
-# 
-# leaflet() %>%
-#   addProviderTiles(providers$CartoDB.Positron) %>%
-#   addRasterImage(r_mean, colors = pal) %>%
-#   addLegend("bottomright",
-#             pal = pal,
-#             values = values(r_mean), title = "Mean"
-#   ) %>%
-#   addScaleBar(position = c("bottomleft"))
+# Define a raster of these values to plot
+r_mean <- raster::rasterize(
+  x = coop, y = access, field = mean, 
+)
+
+ggmap(bh_lines, 
+      base_layer = ggplot(data = r_mean, aes(x = x, y = y, fill = fct_elevation_2))) +
+  geom_raster() +
+  labs(x = "", y = "", col = "Mean") 
+
+
+pal <- colorNumeric("viridis", c(0,530), na.color = "transparent")
+
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addRasterImage(r_mean, colors = pal) %>%
+  addLegend("bottomright",
+            pal = pal,
+            values = values(r_mean), title = "Mean"
+  ) %>%
+  addScaleBar(position = c("bottomleft"))
 
 #------------------------------------------------------------------------------#
 
@@ -234,21 +234,29 @@ ggsave(here::here(figdir,"base_fit_bin30.png"), height = 4, width = 12, units = 
 # Again at prediction locations
 index <- inla.stack.index(stack = stk.full, tag = "pred")$data
 
+
+get_excprob <- function(marg){
+  # exponentiate marginal distribution
+  tmarg <- inla.tmarginal(exp, marg)
+  prob <- 1 - inla.pmarginal(q = 30, marginal = tmarg)
+  return(prob)
+}
+
 # Extract fitted marginals
-# Calculate probability of exceeding 0.2 from this marginal distribution
+# Calculate probability of exceeding 30 days from this marginal distribution
 pred$excprob <- sapply(res$marginals.fitted.values[index],
-                  FUN = function(marg){1 - inla.pmarginal(q = 0.50, marginal = marg)})
+                  FUN = get_excprob)
 
 ggmap(bh_lines, 
       base_layer = ggplot(data = pred,
                           aes(x = x, y = y, fill = excprob))) +
   geom_tile() +
   scale_fill_viridis_c(direction = 1, option = "plasma") +
-  labs(x = "", y = "", fill = "P(risk > 50%)") +
+  labs(x = "", y = "", fill = "P(delay > 30)") +
   coord_fixed(ratio = 1) -> map_exc
 map_exc
 
-ggsave(here::here(figdir,"base_bin30_exc50.png"), map_exc, height = 6, width = 9, units = "in")
+ggsave(here::here(figdir,"base_nb_exc30.png"), map_exc, height = 6, width = 9, units = "in")
 
 
 # Again define a raster and plot
