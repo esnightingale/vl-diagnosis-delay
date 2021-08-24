@@ -6,13 +6,13 @@
 ################################################################################
 source(here::here("code","setup_env.R"))
 
-source(here::here("code","load_data.R"))
+source(here::here("code/main","load_data.R"))
 
-source(here::here("code","define_mesh.R"))
+source(here::here("code/main","define_mesh.R"))
 
-source(here::here("code","setup_spde.R"))
+source(here::here("code/main","setup_spde.R"))
 
-source(here::here("code","make_stack.R"))
+source(here::here("code/main","make_stack.R"))
 
 ################################################################################
 ################################################################################

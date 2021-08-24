@@ -6,11 +6,12 @@
 # Dev version of ggmap
 # devtools::install_github("dkahle/ggmap", force = TRUE)
 # devtools::install_github('joenomiddlename/PStestR', dependencies=T, build_vignettes=T)
+# remotes::install_github("gfalbery/ggregplot")
 
 # Packages required
-packages <- c("tidyverse","lubridate","sf","spdep","rgdal","ggspatial",
+packages <- c("tidyverse","lubridate","gridExtra","sf","spdep","rgdal","ggspatial",
               "ggmap","patchwork","scales","here", "gstat", "biscale",
-              "INLA","inlabru","mapr")
+              "INLA","inlabru", "inlatools", "ggregplot","mapr", "mgcv")
 
 # Check and install if necessary
 installed_packages <- packages %in% rownames(installed.packages())

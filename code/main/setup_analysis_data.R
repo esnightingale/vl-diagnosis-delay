@@ -6,13 +6,14 @@
 
 dat <- readRDS(here::here("data","kamis_cdf.rds")) %>%
   dplyr::filter(with_gps) %>% 
-  dplyr::mutate(age_child = factor(as.numeric(age_cdf < 16), levels = c(1, 0), labels = c("Under 16", "16+")),
-                detection = recode(poss_acd, "0" = "PCD", "1" = "ACD"))  %>%
   dplyr::rename(marg_caste = caste4_r) %>%
-  dplyr::select(country:patient_id, age_cdf, age_child, sex_cdf, hiv_cdf, marg_caste,
-                prv_tx_ka, num_conslt, poss_acd, detection,
-                diag_date_cdf, diag_month_cdf, diag_year_cdf, days_fever_cdf,
-                gt30_cdf, gt90_cdf) 
+  dplyr::select(country:patient_id, age_cdf, age_child, age_cat, sex_cdf, hiv_cdf, 
+                marg_caste, occ4_cat, num_conslt, conslt_cat, prv_tx,  
+                poss_acd, detection, diag_month_cdf, diag_year_cdf, diag_rainseason, 
+                days_fever_cdf, gt30_cdf, gt90_cdf) %>%
+  dplyr::mutate(age_child = factor(as.numeric(age_cdf < 16), levels = c(1, 0), labels = c("Under 16", "16+")),
+                age_cat = factor(cut(age_cdf, breaks = c(0,15,35,100))),
+                detection = recode(poss_acd, "0" = "PCD", "1" = "ACD"))  %>%
 
 names(dat) <- gsub("_cdf", "",names(dat)) 
   

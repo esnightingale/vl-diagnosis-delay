@@ -14,10 +14,10 @@ dat.df <- st_drop_geometry(dat) %>%
                 vill_inc_2017_t = vill_inc_2017*1e3 + 1e-4,
                 IRS_2017_1 = factor(as.numeric(IRS_2017 != 0), 
                                     levels = c(0,1), labels = c("No","Yes")),
-                num_conslt_4 = as.factor(cut(num_conslt, breaks = c(0,1,3,5,8), include.lowest = TRUE)),
+                diag_quarter = as.factor(lubridate::quarter(diag_month)),
                 num_conslt = as.factor(num_conslt),
-                # Add 0.01 to all times to avoid zeros in log transformation
-                traveltime_adj = traveltime + 1)
+                # Add 0.5 to all times to avoid zeros in log transformation
+                traveltime_adj = traveltime + 0.5)
 
 village <- readRDS(here::here("data","analysisdata_village.rds")) 
 
@@ -37,9 +37,11 @@ access <- raster::raster(here::here("data","covariates","diag_facility_travel_ti
 # Delay versus patient characteristics
 # + Age
 # + Sex
-# + Marginalised caste
+# + Marginalised caste (SC/ST)
 # + HIV status
-# + Number of consultations prior to formal diagnosis
+# + Number of consultations prior to formal diagnosis (<=2, 3-5, 6-8)
+# + Occupation (None, unskilled, skilled, selfempl/salaried)
+# + Season of diagnosis (month or rain/dry)
 # + Active/passive detection
 
 dat.df %>%
@@ -53,6 +55,10 @@ create_raincloud(dat.df, "age_child", "days_fever",
                  xlab = "", ylab = "Age", # ylab = "Days fever"
                  y_trans = "log2", col_by = "age_child") -> plot_child
 
+create_raincloud(dat.df, "age_cat", "days_fever", 
+                 xlab = "", ylab = "Age", # ylab = "Days fever"
+                 y_trans = "log2", col_by = "age_cat") -> plot_agecat
+
 create_raincloud(dat.df, "sex", "days_fever", 
                  xlab = "Sex", ylab = "Days fever", 
                  y_trans = "log2", col_by = "sex") -> plot_sex
@@ -62,21 +68,44 @@ create_raincloud(dat.df, "marg_caste", "days_fever",
                  y_trans = "log2", col_by = "marg_caste", 
                  drop_na = TRUE) -> plot_caste
 
+create_raincloud(dat.df, "occ4_cat", "days_fever", 
+                 xlab = "Occupation", ylab = "Days fever", 
+                 y_trans = "log2", col_by = "occ4_cat", 
+                 drop_na = TRUE) -> plot_occ
+
 create_raincloud(dat.df, "hiv", "days_fever", 
                  xlab = "HIV positive", ylab = "Days fever", 
                  y_trans = "log2", col_by = "hiv", 
                  drop_na = TRUE) -> plot_hiv
 
-create_raincloud(dat.df, "prv_tx_ka", "days_fever", 
-                 xlab = "Previous treatment for VL", ylab = "Days fever", 
-                 y_trans = "log2", col_by = "prv_tx_ka", 
+create_raincloud(dat.df, "prv_tx", "days_fever", 
+                 xlab = "Previous treatment for VL or PKDL", ylab = "Days fever", 
+                 y_trans = "log2", col_by = "prv_tx", 
                  drop_na = TRUE) -> plot_ptvl
 
-create_raincloud(dat.df, "num_conslt_4", "days_fever", 
+create_raincloud(dat.df, "num_conslt", "days_fever", 
                  xlab = "No. consultations prior to diagnosis", 
                  ylab = "Days fever", 
-                 y_trans = "log2", col_by = "num_conslt_4", 
+                 y_trans = "log2", col_by = "num_conslt", 
                  drop_na = TRUE) -> plot_conslt
+
+create_raincloud(dat.df, "conslt_cat", "days_fever", 
+                 xlab = "No. consultations prior to diagnosis", 
+                 ylab = "Days fever", 
+                 y_trans = "log2", col_by = "conslt_cat", 
+                 drop_na = TRUE) -> plot_consltcat
+
+create_raincloud(dat.df, "diag_quarter", "days_fever", 
+                 xlab = "Quarter of diagnosis", 
+                 ylab = "Days fever", 
+                 y_trans = "log2", col_by = "diag_quarter", 
+                 drop_na = TRUE) -> plot_quarter
+
+create_raincloud(dat.df, "diag_rainseason", "days_fever", 
+                 xlab = "Diagnosis during rainy season", 
+                 ylab = "Days fever", 
+                 y_trans = "log2", col_by = "diag_rainseason", 
+                 drop_na = TRUE) -> plot_season
 
 create_raincloud(dat.df, "detection", "days_fever", 
                  xlab = "Detection route", ylab = "Days fever", 
@@ -84,27 +113,36 @@ create_raincloud(dat.df, "detection", "days_fever",
                  drop_na = TRUE) -> plot_acd
 
 png(here::here(figdir, "delay_vs_patchar.png"), 
-    height = 8, width = 16, units = "in", res = 300)
+    height = 10, width = 16, units = "in", res = 300)
 gridExtra::grid.arrange(plot_age,
                         plot_child,
+                        plot_agecat,
                         plot_sex,
                         plot_caste,
                         plot_hiv,
+                        plot_occ,
                         plot_ptvl,
-                        plot_conslt,
+                        plot_consltcat,
+                        plot_quarter,
+                        plot_season,
                         plot_acd,
-                        nrow = 2)
+                        nrow = 3)
 dev.off()
 
 pdf(here::here(figdir, "delay_vs_patchar.pdf"), height = 5, width = 6)
 
 plot_age
 plot_child
+plot_agecat
 plot_sex
 plot_caste
 plot_hiv
+plot_occ
 plot_ptvl
 plot_conslt
+plot_consltcat
+plot_quarter
+plot_season
 plot_acd
 
 dev.off()
@@ -227,6 +265,15 @@ dat.df %>%
   labs(y = "Delay (days)", x =  "Travel time (minutes)", col = "Marginalised\ncaste")
 
 dat.df %>%
+  filter(!is.na(occ4_cat)) %>%
+  ggplot(aes(traveltime_adj, days_fever, col = occ4_cat)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth() +
+  scale_y_continuous(trans = "log2") +
+  scale_x_continuous(trans = "log2") +
+  labs(y = "Delay (days)", x =  "Travel time (minutes)", col = "Occupation")
+
+dat.df %>%
   filter(!is.na(hiv)) %>%
   ggplot(aes(traveltime_adj, days_fever, col = hiv)) +
   geom_point(alpha = 0.1) +
@@ -234,6 +281,14 @@ dat.df %>%
   scale_y_continuous(trans = "log2") +
   scale_x_continuous(trans = "log2") +
   labs(y = "Delay (days)", x =  "Travel time (minutes)", col = "HIV status")
+
+dat.df %>%
+  ggplot(aes(traveltime_adj, days_fever, col = diag_rainseason)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth() +
+  scale_y_continuous(trans = "log2")  +
+  scale_x_continuous(trans = "log2") +
+  labs(y = "Delay (days)", x =  "Travel time (minutes)", col = "Rainy season")
 
 dat.df %>%
   ggplot(aes(traveltime_adj, days_fever, col = detection)) +
@@ -405,16 +460,56 @@ make_tab <- function(dat, varname){
                   `> 30 days, N (%)` = paste0(n_gt30, " (",p_gt30,")"),
                   Variable = varname) %>%
     dplyr::select(Variable, Value, N, `Days fever, mean [95% CI]`, `> 30 days, N (%)`) %>%
-    dplyr::arrange(Value) %>%
-    dplyr::mutate(Value = as.character(Value)) -> tab
-  
-  return(tab)
+    dplyr::arrange(Value) -> tab
 
+  return(tab)
+  
 }
 
-varlist <- list("sex","age_child", "marg_caste","hiv", "prv_tx_ka", "num_conslt_4","detection","block_endm_2017" ,"IRS_2017_1", "vill_inc_2017_gt0", "travel_time_cat")
+make_plot <- function(t) {
+  
+  t %>%
+    filter(Value != "NA") %>%
+    separate(`Days fever, mean [95% CI]`, into = c("mean","ll","ul"), sep = "[\\[\\,\\]]", convert = TRUE) %>%
+    ggplot(aes(Value, mean, ymin = ll, ymax = ul)) +
+    geom_linerange() +
+    geom_point() +
+    geom_hline(yintercept = 45, col = "grey") +
+    labs(subtitle = unique(t$Variable), x = "", y =  "") %>%
+    return()
+  
+}
 
-tab <- bind_rows(lapply(varlist, make_tab, dat = dat.df))
+dat.df %>%
+  dplyr::rename(Sex = sex,
+         Age = age_cat,
+         `Scheduled caste or tribe` = marg_caste,
+         Occupation = occ4_cat,
+         `HIV status` = hiv,
+         `Previous VL/PKDL treatment` = prv_tx,
+         `Number of prior consultations` = conslt_cat,
+         Detection = detection,
+         `Block endemic in 2017` = block_endm_2017,
+         `Village IRS targeted in 2017` = IRS_2017_1,
+         `Village incidence > 0 in 2017` = vill_inc_2017_gt0,
+         `Travel time to nearest facility` = travel_time_cat) -> dat.tab
+
+# varlist <- list("sex","age_child", "marg_caste","hiv", "prv_tx_ka", "num_conslt_4","detection","block_endm_2017" ,"IRS_2017_1", "vill_inc_2017_gt0", "travel_time_cat")
+varlist <- list("Sex","Age","Scheduled caste or tribe","Occupation","HIV status", 
+                "Previous VL/PKDL treatment","Number of prior consultations",
+                "Detection","Block endemic in 2017",
+                "Village IRS targeted in 2017","Village incidence > 0 in 2017", 
+                "Travel time to nearest facility")
+
+tabs.list <- lapply(varlist, make_tab, dat = dat.tab)
+
+plots <- lapply(tabs.list, make_plot)
+
+png(here::here(figdir, "covariate_mean_ci_plot.png"), height = 7, width = 10, units = "in", res = 300)
+do.call("grid.arrange", plots)
+dev.off()
+
+tab <- bind_rows(lapply(tabs.list, function(t) mutate(t, Value = as.character(Value))))
 View(tab)
 
 write.csv(tab, here::here("output","table_descriptive.csv"), row.names = FALSE)

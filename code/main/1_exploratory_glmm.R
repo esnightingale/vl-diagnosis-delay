@@ -28,12 +28,78 @@ dat.fit <- dat %>%
 # ---------------------------------------------------------------------------- #
 # Fit regression with individual level covariates and IID random effect on village
 
+
+fit_glmm <- function(covs, dat){
+  
+  mod <- lme4::glmer(formula = formula(paste0("days_fever ~ ", covs, "+ (1|vil_code)")), 
+                     family = "poisson",
+                     data = dat)
+  summary(mod)
+  
+  dat$res <- mod$residuals
+  
+  vg <- variogram(res~1, data = dat)
+  plot(vg)
+  
+  vgmod <- vgm(psill =  0.4, model = "Mat", nugget = 0.3, range = 100)
+  plot(vg, model = vgmod)
+  
+  vgfit <- fit.variogram(vg, model = vgmod)    
+  plot(vg, model = vgfit)
+  
+  vgfit
+  
+  return(mod)
+}
+
+mod.age <- fit_glmm("age_s", dat.fit)
+
+glmm.age <- lme4::glmer(days_fever ~ age_s + (1|vil_code),
+                        family = "poisson",
+                        data = dat.fit)
+
+
+glmm.sex <- lme4::glmer(days_fever ~ sex + (1|vil_code),
+                        family = "poisson",
+                        data = dat.fit)
+
+
+glmm.hiv <- lme4::glmer(days_fever ~ hiv + (1|vil_code),
+                        family = "poisson",
+                        data = dat.fit)
+
+
+glmm.caste <- lme4::glmer(days_fever ~ marg_caste + (1|vil_code),
+                        family = "poisson",
+                        data = dat.fit)
+
+
+glmm.det <- lme4::glmer(days_fever ~ detection + (1|vil_code),
+                        family = "poisson",
+                        data = dat.fit)
+
+
+glmm.cons <- lme4::glmer(days_fever ~ num_conslt + (1|vil_code),
+                        family = "poisson",
+                        data = dat.fit)
+
+
+glmm.prvt <- lme4::glmer(days_fever ~ prv_tx_ka + (1|vil_code),
+                        family = "poisson",
+                        data = dat.fit)
+
+
+mod.list <- list(glmm.age, glmm.sex, glmm.hiv, glmm.caste, glmm.det, glmm.cons, glmm.prvt)
+lapply(mod.list, summary)
+lapply(mod.list, AIC)
+
 glmm.pat <- lme4::glmer(days_fever ~ age_s + sex + hiv + marg_caste + 
-                             detection + num_conslt_cat + prv_tx_ka + (1|i),
+                             detection + num_conslt + (1|vil_code),
                         family = "poisson",
                         data = dat.fit)
 
 summary(glmm.pat)
+AIC(glmm.pat)
 
 # AIC      BIC   logLik deviance df.resid 
 # 57099.2  57156.6 -28540.6  57081.2     4313 
@@ -69,6 +135,8 @@ summary(glmm.pat)
 # detectinACD -0.197  0.011 -0.017  0.073 -0.016              
 # num_conslt  -0.552 -0.034 -0.002 -0.008  0.029  0.023       
 # prv_tx_kaYs -0.103 -0.069  0.034 -0.084 -0.006  0.048  0.041
+
+
 
 # ---------------------------------------------------------------------------- #
 # Explore the relationship between residuals and village covariates
