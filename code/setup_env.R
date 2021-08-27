@@ -10,7 +10,7 @@
 
 # Packages required
 packages <- c("tidyverse","lubridate","gridExtra","sf","spdep","rgdal","ggspatial",
-              "ggmap","patchwork","scales","here", "gstat", "biscale",
+              "ggmap","patchwork","scales","here", "gstat", "variosig", "biscale",
               "INLA","inlabru", "inlatools", "ggregplot","mapr", "mgcv")
 
 # Check and install if necessary

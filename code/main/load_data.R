@@ -5,15 +5,10 @@
 
 source(here::here("code","setup_env.R"))
 
-# # Setup map context
-# blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
-#   st_transform(4326)
-# boundary <- sf::st_union(blockmap)
-# boundary.spdf <- as_Spatial(boundary)
-# 
-# extent <- setNames(st_bbox(blockmap), c("left","bottom","right","top"))
-# bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
+# Proportion to withhold from fitting for final validation
+val.size <- 0.25
 
+# Read data and define final variables for modelling
 dat <- readRDS(here::here("data","analysisdata_individual.rds")) %>%
   mutate(le30 = as.numeric(days_fever <= 30),
          id = row_number(),
@@ -28,14 +23,8 @@ dat <- readRDS(here::here("data","analysisdata_individual.rds")) %>%
          vill_inc_2017_gt0 = factor((replace_na(vill_inc_2017,0) > 0), labels = c("No","Yes")),
   )
 
-# Travel time raster
-# access <- raster::raster(here::here("data","covariates","diag_facility_travel_time.tif"))
-#
-# # All Bihar villages
-# villages <- readRDS(here::here("data","geography","village_centroids_2011.rds")) 
-
 # ---------------------------------------------------------------------------- #
-# Split fitting and validation data
+# Exclude observations missing any covariate of interest
 
 n_all <- nrow(dat)
 dat <- dat %>%
@@ -45,10 +34,13 @@ dat <- dat %>%
   drop_na() 
 
 paste(n_all - nrow(dat),"observations deleted due to missingness")
+# "84 observations deleted due to missingness"
 saveRDS(dat, here::here("data/analysis","dat_nona.rds"))
 
-# Split out final validation data - not to be used for fitting or tuning
-v.idx <- sample(1:nrow(dat), floor(nrow(dat)*0.25))
+# ---------------------------------------------------------------------------- #
+# Split fitting and validation data
+
+v.idx <- sample(1:nrow(dat), floor(nrow(dat)*val.size))
 
 dat.fit <- dat[-v.idx,]
 dat.val <- dat[v.idx,]
@@ -63,7 +55,6 @@ dat.fit.val$days_fever[v.idx] <- NA
 saveRDS(dat.fit, here::here("data/analysis","dat_fit.rds"))
 saveRDS(dat.val, here::here("data/analysis","dat_val.rds"))
 saveRDS(dat.fit.val, here::here("data/analysis","dat_fit_val.rds"))
-
 
 ################################################################################
 ################################################################################

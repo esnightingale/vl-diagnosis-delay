@@ -42,27 +42,27 @@ nrow(dat.test)
 # Define a grid of points at which to make predictions 
 # Extract travel time at these points and form a data frame 
 
-# bnd.sfc <- st_multipoint(bnd$loc) %>%
-#   st_sfc() %>%
-#   st_cast("POLYGON")
-# 
-# bnd.sf <- st_sf(geometry = bnd.sfc) %>%
-#   st_set_crs(4326)
-# 
-# bb <- st_bbox(bnd.sf)
-# x <- seq(bb[1] - 1, bb[3] + 1, length.out = 200)
-# y <- seq(bb[2] - 1, bb[4] + 1, length.out = 200)
-# 
-# grid <- st_multipoint(as.matrix(expand.grid(x, y))) %>%
-#   st_sfc()
-# 
-# coop <- st_sf(geometry = grid) %>%
-#   st_set_crs(4326) %>%
-#   # Bihar state boundary
-#   st_intersection(boundary) %>%
-#   # Model estimation boundary
-#   st_intersection(bnd.sf) %>%
-#   st_coordinates()
+bnd.sfc <- st_multipoint(bnd$loc) %>%
+  st_sfc() %>%
+  st_cast("POLYGON")
+
+bnd.sf <- st_sf(geometry = bnd.sfc) %>%
+  st_set_crs(4326)
+
+bb <- st_bbox(bnd.sf)
+x <- seq(bb[1] - 1, bb[3] + 1, length.out = 200)
+y <- seq(bb[2] - 1, bb[4] + 1, length.out = 200)
+
+grid <- st_multipoint(as.matrix(expand.grid(x, y))) %>%
+  st_sfc()
+
+coop <- st_sf(geometry = grid) %>%
+  st_set_crs(4326) %>%
+  # Bihar state boundary
+  st_intersection(boundary) %>%
+  # Model estimation boundary
+  st_intersection(bnd.sf) %>%
+  st_coordinates()
 # 
 # # Remove L1 var
 # coop <- coop[,1:2]

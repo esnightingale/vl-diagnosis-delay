@@ -1,6 +1,6 @@
 fit_inla <- function(f, data, cpo = FALSE, predictor = FALSE, verbose = TRUE){
   
-  if(cpo){
+  if(cpo) {
   res <- inla(f,
               family = "poisson",
               control.family = list(link = "log"),

@@ -72,7 +72,7 @@ dat_incl <- st_intersection(dat.sf, buffer)
 #           col = "green", alpha = 0.5)
 
 
-# Return final included locations to lat/long projection and map out
+# Return final included locations to lat/long projection on KM scale
 dat_clean <- dat_incl %>%
   st_transform(4326) 
 

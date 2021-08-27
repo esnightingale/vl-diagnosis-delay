@@ -15,8 +15,8 @@
 ################################################################################
 ################################################################################
 
-figdir <- "figures/fit/cross-validation/covs_all"
-outdir <- "output/cross-validation/covs_all"
+figdir <- "figures/fit/cross-validation/no_covs"
+outdir <- "output/cross-validation/no_covs"
 
 covs_pat <- c("age_s","sex","hiv")
 covs_ses <- c("marg_caste","occ4_cat")
@@ -32,8 +32,8 @@ spde <- readRDS(here::here("data/analysis","spde.rds"))
 #------------------------------------------------------------------------------#
 # Initialise IID and SPDE models with all data
 
-covs.list <- covs_all
-M <- 10
+covs.list <- NULL # covs_all
+M <- 3
 
 # run_crossval <- function(covs.list, outdir, M = 10) {
   
@@ -43,17 +43,46 @@ M <- 10
   f3 <- as.formula(paste0("days_fever ~ ", paste0(covs.list, collapse = " + "), " + f(id, model = 'iid') + f(v, model = spde)"))
 
 # Fit full models 
-  fits.init <- plyr::llply(list(IID = f1, SPDE = f2, IID_SPDE = f3), init_inla, data = dat.fit)
+  fits.init <- plyr::llply(list(IID = f1, 
+                                # SPDE = f2, 
+                                IID_SPDE = f3), 
+                           init_inla, 
+                           family = "poisson",
+                           data = dat.fit)
   saveRDS(fits.init, here::here(outdir, "fits_init.rds"))
 
   # lapply(fits.init, plyr::llply(fits.init, function(x) summary(x$res)))
-
+  plyr::llply(fits.init, function(x) x$fit$dic$dic)
+  # $IID
+  # [1] 23643.69
+  # 
+  # $IID_SPDE
+  # [1] 23643.97
+  
 # Compare fitted regression estimates
 
   ggregplot::Efxplot(plyr::llply(fits.init, function(x) x$fit),
-                     ModelNames = c("IID","SPDE","Both"),
+                     ModelNames = c("IID",
+                                    # "SPDE",
+                                    "Both"),
                      Intercept = FALSE)
   ggsave(here::here(figdir, "fits_init_efx.png"), height = 6, width = 8, units = "in", dpi = 320)
+
+#----------------#
+# Spatial LOO CV #
+#----------------#
+  
+INLAutils::inlasloo(st_drop_geometry(dat.fit),
+                    long = "longitude",
+                    lat = "latitude",
+                    y = "days_fever",
+                    family = "poisson",
+                    ss = 4,
+                    rad = 0.1,
+                    modform = f3,
+                    mesh = mesh,
+                    print = TRUE,
+                    plot = TRUE)
 
 #-------------------------------------#
 # Refit with subsampled training data #
@@ -74,7 +103,9 @@ M <- 10
   # saveRDS(fits.xval, here::here(outdir, "fits_xval.rds"))
   
   # In loop, save as go along
-  for (model in c("IID","SPDE","IID_SPDE")) {
+  for (model in c("IID",
+                  # "SPDE",
+                  "IID_SPDE")) {
     
     saveRDS(run_crossval(fits.init[[model]], M = M), 
             here::here(outdir, 

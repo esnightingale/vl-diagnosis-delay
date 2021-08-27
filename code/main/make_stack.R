@@ -2,151 +2,142 @@
 # Define data stacks
 ################################################################################
 
-# Organise the data, projection matrices and fixed/random effects into a "stack".
-# Need separate ones for estimation at observed locations and prediction across
-# defined grid
+dat <- readRDS(here::here("data/analysis","dat_nona.rds")) 
+spde <- readRDS(here::here("data/analysis","spde.rds"))
+mesh <- readRDS(here::here("data/analysis","mesh.rds"))
+coop <- readRDS(here::here("data/analysis","coop.rds"))
 
-# List A contains 1 to indicate fixed effects are mapped one to one, and a projection
-# matrix for the random effects
+# Covariates of interest
+covs <- c("age_s","sex","hiv",
+          "marg_caste","occ4_cat",
+          "block_endm_2017", "IRS_2017_1","vill_inc_2017_gt0", "prv_tx",
+          "traveltime_s", "rain",
+          "detection","consult_gt1")
 
-covs_pat <- c("age_s","sex","hiv","marg_caste","occ4_cat","prv_tx")
-covs_choice <- c("detection","conslt_gt1", "traveltime_s")
-covs_vil <- c("block_endm_2017", "IRS_2017_1","vill_inc_2017_gt0")
+#------------------------------------------------------------------------------#
+# Generate the index set for this SPDE
 
-covs_pat_f <- paste(covs_pat, collapse = " + ")
-covs_vil_f <- paste(covs_vil, collapse = " + ")
+indexs <- inla.spde.make.index("s", spde$n.spde)
+lengths(indexs)
 
-# Rename levels of num_conslt to avoid special character errors in later formulae
-# dat.fit$num_conslt_cat <- factor(dat.fit$num_conslt_cat, labels = c("0_1","1_3","3_5","5_8"))
+#------------------------------------------------------------------------------#
+# Split training and testing data
 
-# Define model matrix based on selected covariates from previous baseline/IID modelling, removing automatic intercept
-X <- model.matrix(as.formula(paste("~ ",covs_pat_f," + ", covs_vil_f)), data = dat.train)[,-1] 
-Xt <- model.matrix(as.formula(paste("~ ",covs_pat_f," + ", covs_vil_f)), data = dat.test)[,-1] 
-# Xp <- model.matrix(~ traveltime_s, data = dat.pred)[,-1] 
+# Random partition
+# test.idx <- sample(1:nrow(dat), floor(nrow(dat)*test.size))
+# 
+# dat.train <- dat[-test.idx,]
+# dat.test <- dat[test.idx,]
+
+# Spatial partition
+make_partition <- function(data, r = 0.1) {
+  
+  # Randomly sample one observation from data
+  samp <- sample_n(data, 1)
+  
+  # Define buffer of radius r around observation
+  buff <- st_buffer(samp, dist = r)
+  
+  # Intersect full dataset with buffer
+  index <- st_intersects(data, buff, sparse = FALSE)
+  
+  train <- data[-index,]
+  test <- data[index,]
+  
+  return(list(train = train, test = test))
+  
+}
+
+M = 10
+partitions <- lapply(1:M, make_partition, data = dat)
+saveRDS(partitions, here::here("data/analysis","partitions.rds"))
+
+plot_partition <- function(part) {
+  ggplot() +
+    gg(as_Spatial(boundary)) +
+    gg(as_Spatial(part$train)) +
+    gg(as_Spatial(part$test), col = "red")
+}
+lapply(partitions, plot_partition)
+
+# Define function to make stacks from given train/test partition
+make_stacks <- function(dat.partition) {
+
+  dat.train <- dat.partition$train
+  dat.test <- dat.partition$test
+  
+#------------------------------------------------------------------------------#
+# Generate a projection matrices A - projects the spatially continuous GRF from
+# the observations to the mesh nodes
+
+  # For training points
+  coo <- st_coordinates(dat.train)
+  A <- inla.spde.make.A(mesh = mesh, loc = coo)
+  
+  dim(A)
+  nrow(dat.train)
+ 
+  # Testing
+  coot <- st_coordinates(dat.test)
+  At <- inla.spde.make.A(mesh = mesh, loc = coot)
+  
+  dim(At)
+  nrow(dat.test)
+
+  # Prediction
+  Ap <- inla.spde.make.A(mesh = mesh, loc = coop)
+
+#------------------------------------------------------------------------------#
+# Organise the data, projection matrices and fixed/random effects into stacks
+
+  # Define model matrix based on all covariates of interest, removing automatic 
+  # intercept
+  X1 <- model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))), 
+                    data = dat.train)[,-1] 
+  X2 <- model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))), 
+                    data = dat.test)[,-1] 
+  
+  # Training stack
+  stk.train <- inla.stack(
+    tag = "train",
+    data = list(y = dat.train$days_fever),
+    A = list(A, 1),
+    effects = list(v = indexv,  # the spatial index,
+                   data.frame(  # covariates
+                     Intercept = 1, 
+                     X1)
+                   )
+  )
+  
+  # Testing stack
+  stk.test <- inla.stack(
+    tag = "test",
+    data = list(y = dat.test$days_fever),
+    A = list(A, 1),
+    effects = list(v = indexv,  # the spatial index,
+                   data.frame(  # covariates
+                     Intercept = 1, 
+                     X2)
+    )
+  )
+  
+  # Stack for smooth prediction from intercept and fitted spatial field (no covariates)
+  stk.pred <- inla.stack(
+    tag = "pred",
+    data = list(y = NA),
+    A = list(Ap, 1),
+    effects = list(v = indexv,
+                   data.frame(
+                     Intercept = rep(1, nrow(coop)))
+                   )
+  )
+  
+  # Combine stacks
+  stk.full <- inla.stack(stk.train, stk.test, stk.pred)
+
+  return(stk.full)
+}
 
 
-# Make the stack
-stk.train <- inla.stack(
-  tag = "train",
-  data = list(y = dat.train$days_fever),
-  A = list(A, 1, 1),
-  effects = list(s = indexs,  #the spatial index,
-                 id = dat.train$id, # IID index
-                 data.frame(Intercept = 1, # Covariates
-                            X))
-)
-
-# stack for validation at witheld test points stk.v
-stk.test <- inla.stack(
-  tag = "test",
-  data = list(y = NA),
-  A = list(At, 1, 1),
-  effects = list(s = indexs, 
-                 id = dat.test$id, 
-                 data.frame(Intercept = 1, 
-                            Xt))
-)
-
-# stack for prediction stk.p - only predicting from intercept and fitted spatial field
-# stk.p <- inla.stack(
-#   tag = "pred",
-#   data = list(y = NA),
-#   A = list(Ap, 1),
-#   effects = list(s = indexs,
-#                  data.frame(Intercept = rep(1, nrow(coop)),
-#                             X = Xp))
-# )
-
-# stk.full has stk.e and stk.p
-stk.full <- inla.stack(stk.train, stk.test)
-
-
-# # Stack for spatio-temporal 
-# 
-# # Specifying a new set of SPDE components ####
-# 
-# Groups = "q"
-# 
-# NGroups <- length(unique(dat.fit[,Groups])) 
-# 
-# A2 <- inla.spde.make.A(mesh, # Leave
-#                        loc = coo, # Leave
-#                        group = as.numeric(as.factor(dat.fit.df[,Groups])), # this must be a numeric value counting from 1. If the groups variable is a factor, this will happen by default.
-#                        n.group = NGroups) 
-# 
-# w.Host2 <- inla.spde.make.index(
-#   name    = 'w', 
-#   n.spde  = Hosts.spde$n.spde,
-#   n.group = NGroups)  
-# 
-# StackHost2 <- inla.stack( 
-#   data = list(y = TestHosts[,resp]), # Leave
-#   
-#   A = list(1, 1, 1, HostA2), # Change the A matrix to the new one
-#   
-#   effects = list(
-#     Intercept = rep(1, N), # Leave
-#     X = X, # Leave
-#     ID = TestHosts$ID, # Leave
-#     
-#     w = w.Host2)) # CHANGE
-# 
-# # Stack for estimation/validation/prediction
-#  
-# # Prediction stack has the response set as NA
-# 
-# # stack for estimation stk.e
-# stk.e <- inla.stack(
-#   tag = "est", 
-#   data = list(y = dat.fit$days_fever),
-#   A = list(A, 1, 1),
-#   effects = list(s = indexs, i = dat.fit.df$i, 
-#                  list(data.frame(b0 = 1, 
-#                                  # patient chars
-#                                  age = dat.fit.df$age,
-#                                  sex = dat.fit.df$sex,
-#                                  hiv = dat.fit.df$hiv,
-#                                  marg_caste = dat.fit.df$marg_caste,
-#                                  detection = dat.fit.df$detection,
-#                                  prv_tx_ka = dat.fit.df$prv_tx_ka,
-#                                  # village chars
-#                                  num_conslt_cat = dat.fit.df$num_conslt_cat,
-#                                  vill_inc_2017_gt0 = dat.fit.df$vill_inc_2017_gt0,
-#                                  IRS_2017_1 = dat.fit.df$IRS_2017_1,
-#                                  block_endm_2017 = dat.fit.df$block_endm_2017,
-#                                  traveltime = dat.fit.df$traveltime)))
-# )
-# 
-# 
-# # stack for validation at witheld test points stk.v
-# stk.v <- inla.stack(
-#   tag = "val",
-#   data = list(y = dat.val.df$days_fever),
-#   A = list(Av, 1, 1),
-#   effects = list(s = indexs, i = dat.val.df$i, 
-#                  list(data.frame(b0 = 1, 
-#                                  # patient chars
-#                                  age = dat.val.df$age,
-#                                  sex = dat.val.df$sex,
-#                                  hiv = dat.val.df$hiv,
-#                                  marg_caste = dat.val.df$marg_caste,
-#                                  detection = dat.val.df$detection,
-#                                  prv_tx_ka = dat.val.df$prv_tx_ka,
-#                                  # village chars
-#                                  num_conslt_cat = dat.val.df$num_conslt_cat,
-#                                  vill_inc_2017_gt0 = dat.val.df$vill_inc_2017_gt0,
-#                                  IRS_2017_1 = dat.val.df$IRS_2017_1,
-#                                  block_endm_2017 = dat.val.df$block_endm_2017,
-#                                  traveltime = dat.val.df$traveltime)))
-# )
-# 
-# # stack for prediction stk.p
-# stk.p <- inla.stack(
-#   tag = "pred",
-#   data = list(y = NA),
-#   A = list(1, Ap),
-#   effects = list(data.frame(b0 = rep(1, nrow(coop))), s = indexs)
-# )
-# 
-# # stk.full has stk.e and stk.p
-# stk.full <- inla.stack(stk.e, stk.v, stk.p)
+################################################################################
+################################################################################

@@ -1,53 +1,95 @@
 ################################################################################
-# Description: Define mesh on case village locations
+# Description: 
+# + Define mesh on case village locations (all data) 
+# + Specify SPDE on this mesh
+# + Generate grid of points across mesh range to predict at
 ################################################################################
 ################################################################################
 
-# Split training and tuning data
-# test.idx <- sample(1:nrow(dat.fit), floor(nrow(dat.fit)*0.25))
-# 
-# dat.train <- dat.fit[-test.idx,]
-# dat.test <- dat.fit[test.idx,]
-# 
-# dat.train.df <- st_drop_geometry(dat.train)
-# dat.test.df <- st_drop_geometry(dat.test)
-
-dat.fit <- readRDS(here::here("data/analysis","dat_fit.rds"))
+# Define mesh using all data
+dat.train <- readRDS(here::here("data/analysis","dat_nona.rds")) 
 
 # Pull coordinates
-coo <- st_coordinates(dat.fit)
+coo <- st_coordinates(dat.train)
 
+# Define smooth boundary around points
 bnd <- inla.nonconvex.hull(coo, convex = 0.3)
 
 # Define a mesh across the points within boundary
 mesh <- inla.mesh.2d(
   boundary = bnd,
-  # loc = coo,
-  offset = c(0.5, 0.3),
-  max.edge = c(0.1, 2), # small triangles within the region and large around the edge
-  cutoff = 0.05) # avoid constructing many small triangles where points are close together
+  loc = coo,
+  offset = c(0.2, 0.2),
+  max.edge = c(0.1, 2),
+  cutoff = 0.01) 
 
 # Number of vertices
 mesh$n
 
-# plot(mesh)
-# points(coo, col = "red")
-
 ggplot() +
   gg(mesh) +
   # gg(boundary.spdf) +
-  gg(as_Spatial(dat.fit), col = "red", cex = 0.5) +
+  # gg(as_Spatial(dat.fit), col = "red", cex = 0.5) +
   coord_fixed()
-ggsave(here::here("figures/fit","mesh.png"), height = 5, width = 7, unit = "in")
 
-# saveRDS(mesh, here::here("output","mesh.rds"))
+ggsave(here::here("figures/fit","mesh.png"), height = 7, width = 9, unit = "in", dpi = 320)
 
-# Define SPDE model from this mesh
+saveRDS(mesh, here::here("data/analysis","mesh.rds"))
+
+# Define SPDE model from this mesh 
+# Raw variogram suggests range of ~75km - what scale is prior range on?
+
+dat.train %>% 
+  st_drop_geometry() %>%
+  group_by(v) %>% 
+  summarise(vil.mean = mean(log(days_fever))) %>%
+  ungroup() %>%
+  summarise(mean.all = mean(vil.mean),
+            sd.all = sd(vil.mean))
+# mean.all sd.all
+#     3.63  0.565
+
 spde <- inla.spde2.pcmatern(mesh = mesh, 
-                            prior.range = c(0.05, 0.01), # P(practic.range < 0.05) = 0.01
+                            prior.range = c(10, 0.01), # P(range < 10) = 0.01
                             prior.sigma = c(1, 0.01), # P(sigma > 1) = 0.01
                             constr = TRUE)
 saveRDS(spde, here::here("data/analysis","spde.rds"))
+
+#------------------------------------------------------------------------------#
+# Define a grid of points at which to make predictions 
+
+# State boundary
+boundary <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
+  sf::st_transform(7759) %>%
+  sf::st_union() %>% 
+  st_transform(4326)
+
+bnd.sfc <- st_multipoint(bnd$loc) %>%
+  st_sfc() %>%
+  st_cast("POLYGON")
+
+bnd.sf <- st_sf(geometry = bnd.sfc) %>%
+  st_set_crs(4326)
+
+bb <- st_bbox(bnd.sf)
+x <- seq(bb[1] - 1, bb[3] + 1, length.out = 200)
+y <- seq(bb[2] - 1, bb[4] + 1, length.out = 200)
+
+grid <- st_multipoint(as.matrix(expand.grid(x, y))) %>%
+  st_sfc()
+
+coop <- st_sf(geometry = grid) %>%
+  st_set_crs(4326) %>%
+  # Bihar state boundary
+  st_intersection(boundary) %>%
+  # Model estimation boundary
+  st_intersection(bnd.sf) %>%
+  st_coordinates()
+
+# Remove L1 var
+coop <- coop[,1:2]
+
+saveRDS(coop, here::here("data/analysis","coop.rds"))
 
 ################################################################################
 ################################################################################
