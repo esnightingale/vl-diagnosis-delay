@@ -9,8 +9,7 @@ figdir <- "figures/descriptive"
 # Load analysis data
 dat <- readRDS(here::here("data","analysisdata_individual.rds")) %>%
   dplyr::mutate(delay_cat5 = cut(days_fever, c(0,15,30,90,180,730), include.lowest = TRUE, ordered_result = TRUE),
-                delay_cat3 = cut(days_fever, c(0,30,90,730), include.lowest = TRUE, ordered_result = TRUE),
-                detection = factor(poss_acd, labels = c("PCD","ACD"))) %>%
+                delay_cat3 = cut(days_fever, c(0,30,90,730), include.lowest = TRUE, ordered_result = TRUE)) %>%
   arrange(days_fever)
 
 # Setup map context
@@ -25,7 +24,7 @@ bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
 
 summary(dat$days_fever)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-# 4.00   25.00   30.00   45.01   58.00  510.00 
+# 4.00   25.00   30.00   45.06   58.00  510.00 
 summary(dat$delay_cat5)
 # [0,15]   (15,30]   (30,90]  (90,180] (180,730] 
 # 198      2284      1607       251        54 

@@ -34,7 +34,7 @@ Tmat.GC <- gdistance::geoCorrection(Tmat)
 
 # Read in health facility locations
 facility <- read.csv(here::here("data","covariates",
-                                    "Health facilties coordinates-revised-7-mar-2018 - wILR.csv"), 
+                                    "Health facilties coordinates-revised-7-mar-2018.csv"), 
                          header = TRUE) %>%
   dplyr::filter(State == "Bihar") %>%
   tidyr::separate(Coordinates, into = c("y", "x"), sep = ",", convert = TRUE) %>%
@@ -53,8 +53,8 @@ sp::proj4string(facility) <- sp::proj4string(bh.shp)
 overlap <- sp::over(facility, raster::buffer(bh.shp, 1))
 facility <- facility[!is.na(overlap),]
 
-sp::plot(bh.shp, main = "Health facilities with VL diagnosis/treatment capacity in Bihar")
-sp::plot(facility, add = T)
+# sp::plot(bh.shp, main = "Health facilities with VL diagnosis/treatment capacity in Bihar")
+# sp::plot(facility, add = T)
 
 ggplot() +
   geom_sf(data = st_as_sf(bh.shp), aes(geometry = geometry), fill = "white") +

@@ -14,8 +14,6 @@ dat.df <- st_drop_geometry(dat) %>%
                 vill_inc_2017_t = vill_inc_2017*1e3 + 1e-4,
                 IRS_2017_1 = factor(as.numeric(IRS_2017 != 0), 
                                     levels = c(0,1), labels = c("No","Yes")),
-                diag_quarter = as.factor(lubridate::quarter(diag_month)),
-                num_conslt = as.factor(num_conslt),
                 # Add 0.5 to all times to avoid zeros in log transformation
                 traveltime_adj = traveltime + 0.5)
 
@@ -32,6 +30,12 @@ bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
 
 # Travel time raster
 access <- raster::raster(here::here("data","covariates","diag_facility_travel_time.tif"))
+
+# ---------------------------------------------------------------------------- #
+# Patients with negative delay
+
+dat %>%
+  
 
 # ---------------------------------------------------------------------------- #
 # Delay versus patient characteristics
@@ -52,11 +56,11 @@ dat.df %>%
   labs(x = "Age (years)", y = "Days fever", col = "") -> plot_age
 
 create_raincloud(dat.df, "age_child", "days_fever", 
-                 xlab = "", ylab = "Age", # ylab = "Days fever"
+                 xlab = "", ylab = "Days fever", 
                  y_trans = "log2", col_by = "age_child") -> plot_child
 
 create_raincloud(dat.df, "age_cat", "days_fever", 
-                 xlab = "", ylab = "Age", # ylab = "Days fever"
+                 xlab = "", ylab = "Days fever",
                  y_trans = "log2", col_by = "age_cat") -> plot_agecat
 
 create_raincloud(dat.df, "sex", "days_fever", 
@@ -68,9 +72,9 @@ create_raincloud(dat.df, "marg_caste", "days_fever",
                  y_trans = "log2", col_by = "marg_caste", 
                  drop_na = TRUE) -> plot_caste
 
-create_raincloud(dat.df, "occ4_cat", "days_fever", 
+create_raincloud(dat.df, "occupation", "days_fever", 
                  xlab = "Occupation", ylab = "Days fever", 
-                 y_trans = "log2", col_by = "occ4_cat", 
+                 y_trans = "log2", col_by = "occupationcat", 
                  drop_na = TRUE) -> plot_occ
 
 create_raincloud(dat.df, "hiv", "days_fever", 
@@ -95,12 +99,6 @@ create_raincloud(dat.df, "conslt_cat", "days_fever",
                  y_trans = "log2", col_by = "conslt_cat", 
                  drop_na = TRUE) -> plot_consltcat
 
-create_raincloud(dat.df, "diag_quarter", "days_fever", 
-                 xlab = "Quarter of diagnosis", 
-                 ylab = "Days fever", 
-                 y_trans = "log2", col_by = "diag_quarter", 
-                 drop_na = TRUE) -> plot_quarter
-
 create_raincloud(dat.df, "diag_rainseason", "days_fever", 
                  xlab = "Diagnosis during rainy season", 
                  ylab = "Days fever", 
@@ -123,7 +121,7 @@ gridExtra::grid.arrange(plot_age,
                         plot_occ,
                         plot_ptvl,
                         plot_consltcat,
-                        plot_quarter,
+                        # plot_quarter,
                         plot_season,
                         plot_acd,
                         nrow = 3)
@@ -141,7 +139,7 @@ plot_occ
 plot_ptvl
 plot_conslt
 plot_consltcat
-plot_quarter
+# plot_quarter
 plot_season
 plot_acd
 
@@ -265,8 +263,8 @@ dat.df %>%
   labs(y = "Delay (days)", x =  "Travel time (minutes)", col = "Marginalised\ncaste")
 
 dat.df %>%
-  filter(!is.na(occ4_cat)) %>%
-  ggplot(aes(traveltime_adj, days_fever, col = occ4_cat)) +
+  filter(!is.na(occupationcat)) %>%
+  ggplot(aes(traveltime_adj, days_fever, col = occupationcat)) +
   geom_point(alpha = 0.1) +
   geom_smooth() +
   scale_y_continuous(trans = "log2") +
@@ -484,7 +482,7 @@ dat.df %>%
   dplyr::rename(Sex = sex,
          Age = age_cat,
          `Scheduled caste or tribe` = marg_caste,
-         Occupation = occ4_cat,
+         Occupation = occupation,
          `HIV status` = hiv,
          `Previous VL/PKDL treatment` = prv_tx,
          `Number of prior consultations` = conslt_cat,

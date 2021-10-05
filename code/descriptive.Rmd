@@ -20,8 +20,7 @@ figdir <- "figures/descriptive"
 # Load analysis data
 dat <- readRDS(here::here("data","analysisdata_individual.rds")) %>%
   dplyr::mutate(delay_cat5 = cut(days_fever, c(0,15,30,90,180,730), include.lowest = TRUE, ordered_result = TRUE),
-                delay_cat3 = cut(days_fever, c(0,30,90,730), include.lowest = TRUE, ordered_result = TRUE),
-                detection = factor(poss_acd, labels = c("PCD","ACD"))) %>%
+                delay_cat3 = cut(days_fever, c(0,30,90,730), include.lowest = TRUE, ordered_result = TRUE)) %>%
   arrange(days_fever)
 
 # Setup map context
@@ -48,6 +47,7 @@ ggsave(here::here(figdir,"total_inc.png"),
        height = 4, width = 5, units = "in")
 
 n_distinct(dat$vil_code)
+# 2355
 
 # Plot data locations 
 ggmap(bh_lines, 
@@ -352,11 +352,12 @@ bv
 ggsave(here::here(figdir, "block_propgt30_byinc_bv.png"), bv, height = 7, width = 10, units = "in")
 
 ```
+
 ```{r by_blk_mth}
 
 dat %>%
   st_drop_geometry() %>%
-  mutate(diag_q = lubridate::quarter(diag_date, with_year = TRUE)) %>%
+  mutate(diag_q = lubridate::quarter(diag_month, with_year = TRUE)) %>%
   group_by(district, block, diag_q) %>%
   summarise(N = n(),
             medianOD = median(days_fever, na.rm = T),
@@ -367,7 +368,7 @@ dat %>%
   complete(diag_q, nesting(district, block), fill = list(N = 0)) -> by_block
 
 by_block <- blockmap %>%
-  left_join(by_block, by = c("kamis_master_dist" = "district", "kamis_master_block" = "block")) %>%
+  left_join(by_block, by = c("kamis_master_dist" = "district", "kamis_master_block" = "block"))%>%
   rowwise() %>%
   mutate(pop = median(c_across(`2018`:`2019`)),
          inc = N*1e4/pop) %>%
@@ -387,7 +388,7 @@ bv <- create_bivmap(blockmap, filter(plotdat, diag_q == q),
                    title = q) 
 bv
 
-ggsave(here::here(figdir,"by month",paste0("block_propgt30_byinc_",q,".png")), bv, height = 7, width = 10, units = "in")
+ggsave(here::here(figdir,"by quarter",paste0("block_propgt30_byinc_",q,".png")), bv, height = 7, width = 10, units = "in")
 
 }
 ```
@@ -399,9 +400,11 @@ ggsave(here::here(figdir,"by month",paste0("block_propgt30_byinc_",q,".png")), b
 # dat <- filter(dat, !is.na(longitude) & !is.na(days_fever_cdf))
 
 # convert simple data frame into a spatial data frame object
-dat.spdf <- as_Spatial(dat)
+dat.spdf <- dat %>%
+    sf::st_transform(7759) %>%
+    as_Spatial()
 
-vg <- variogram(days_fever~1, data = dat)
+vg <- variogram(days_fever~1, data = dat.spdf)
 plot(vg)
 
 vgmod <- vgm(psill =  800, model = "Mat", nugget = 1000, range = 100)
@@ -418,93 +421,5 @@ vgfit
 png(here::here(figdir, "delay_semivariogram.png"), height = 500, width = 600)
 plot(vg, model = vgfit)
 dev.off()
-
-
-```
-
-## Covariate effects
-
-```{r covs_indiv}
-
-plotdat <- st_drop_geometry(dat)
-
-# Found to be significant in Dubey et al.
-dat %>%
-  ggplot(aes(age, days_fever)) +
-  geom_jitter(alpha = 0.1) 
-
-dat %>%
-  ggplot(aes(sex, days_fever)) +
-  geom_boxplot()
-
-dat %>%
-  ggplot(aes(hiv, days_fever)) +
-  geom_boxplot()
-
-dat %>%
-  ggplot(aes(caste4, days_fever)) +
-  geom_boxplot()
-
-dat %>%
-  ggplot(aes(mahadalit4, days_fever)) +
-  geom_boxplot()
-
-dat %>%
-  ggplot(aes(prv_tx_ka, days_fever)) +
-  geom_boxplot()
-
-```
-
-
-```{r covs_physical}
-
-
-dat %>%
-  st_drop_geometry() %>%
-  ggplot(aes(traveltime, days_fever)) +
-  geom_jitter(alpha = 0.1) 
-  # scale_y_continuous(trans = "log10")
-
-
-dat %>%
-  st_drop_geometry() %>%
-  ggplot(aes(gt30, traveltime + 1)) +
-  geom_boxplot() +
-  scale_y_continuous(trans = "log2")
-
-dat %>%
-  st_drop_geometry() %>%
-  ggplot(aes(gt90, traveltime + 1)) +
-  geom_boxplot() +
-  scale_y_continuous(trans = "log2")
-
-
-
-```
-
-
-```{r covs_riskperception}
-
-
-dat %>%
-  st_drop_geometry() %>%
-  ggplot(aes(traveltime, days_fever)) +
-  geom_jitter(alpha = 0.1) 
-  # scale_y_continuous(trans = "log10")
-
-
-dat %>%
-  st_drop_geometry() %>%
-  ggplot(aes(gt30, traveltime + 1)) +
-  geom_boxplot() +
-  scale_y_continuous(trans = "log2")
-
-dat %>%
-  st_drop_geometry() %>%
-  ggplot(aes(gt90, traveltime + 1)) +
-  geom_boxplot() +
-  scale_y_continuous(trans = "log2")
-
-
 
 ```

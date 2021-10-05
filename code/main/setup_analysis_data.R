@@ -7,13 +7,23 @@
 dat <- readRDS(here::here("data","kamis_cdf.rds")) %>%
   dplyr::filter(with_gps) %>% 
   dplyr::rename(marg_caste = caste4_r) %>%
-  dplyr::select(country:patient_id, age_cdf, age_child, age_cat, sex_cdf, hiv_cdf, 
-                marg_caste, occ4_cat, num_conslt, conslt_cat, prv_tx,  
-                poss_acd, detection, diag_month_cdf, diag_year_cdf, diag_rainseason, 
-                days_fever_cdf, gt30_cdf, gt90_cdf) %>%
   dplyr::mutate(age_child = factor(as.numeric(age_cdf < 16), levels = c(1, 0), labels = c("Under 16", "16+")),
-                age_cat = factor(cut(age_cdf, breaks = c(0,15,35,100))),
-                detection = recode(poss_acd, "0" = "PCD", "1" = "ACD"))  %>%
+                age_cat = factor(cut(age_cdf, breaks = c(0,15,35,100), include.lowest = TRUE)),
+                occupation = recode(occ4_cat, 
+                                    "0" = "Not working",
+                                    "1" = "Unskilled",
+                                    "2" = "Skilled",
+                                    "3" = "Salaried/self-employed"),
+                prv_tx = factor((prv_tx_ka == "Yes" | prvtx_pkdl == "Yes"), levels = c(FALSE,TRUE), labels = c("No","Yes")),
+                conslt_cat = factor(cut(num_conslt, breaks = c(0,2,5,8), include.lowest = TRUE)),
+                num_conslt = as.factor(num_conslt),
+                detection = recode(poss_acd, "0" = "PCD", "1" = "ACD"),
+                diag_rainseason = factor(lubridate::month(diag_date_cdf) %in% 6:9, levels = c(FALSE,TRUE), labels = c("No","Yes")),
+                delay = days_fever_cdf - 14) %>%
+dplyr::select(country:patient_id, age_cdf, age_child, age_cat, sex_cdf, hiv_cdf, 
+              marg_caste, occupation, num_conslt, conslt_cat, prv_tx,  
+              detection, diag_month_cdf, diag_year_cdf, diag_rainseason, 
+              days_fever_cdf, gt30_cdf, gt90_cdf, delay) 
 
 names(dat) <- gsub("_cdf", "",names(dat)) 
   
