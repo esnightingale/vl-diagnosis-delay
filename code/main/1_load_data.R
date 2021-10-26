@@ -15,22 +15,21 @@ dat <- readRDS(here::here("data","analysisdata_individual.rds")) %>%
          v = as.numeric(as.factor(vil_code)),
          rain = as.numeric(diag_rainseason),
          age_s = as.numeric(scale(age, center = T)),
-         consult_gt1 = (num_conslt > 1),
+         consult_gt0 = (num_conslt != "0"),
          traveltime_s = as.numeric(scale(traveltime, center = T)),
          IRS_2017_1 = factor((IRS_2017 != 0), labels = c("No","Yes")),
          vill_inc_2017_t = vill_inc_2017*1e3 + 1e-4,
          vill_inc_2017_s = as.numeric(scale(vill_inc_2017, center = T)),
-         vill_inc_2017_gt0 = factor((replace_na(vill_inc_2017,0) > 0), labels = c("No","Yes")),
-  )
+         vill_inc_2017_gt0 = factor((replace_na(vill_inc_2017,0) > 0), labels = c("No","Yes")))
 
 # ---------------------------------------------------------------------------- #
 # Exclude observations missing any covariate of interest
 
 n_all <- nrow(dat)
 dat <- dat %>%
-  dplyr::select(days_fever, age_s, sex, hiv, marg_caste, occ4_cat, detection, prv_tx, 
-                consult_gt1, latitude, longitude, traveltime, traveltime_s, vill_inc_2017_t,
-                vill_inc_2017_gt0, IRS_2017_1, block_endm_2017, id, v, rain) %>%
+  dplyr::select(days_fever, age_s, sex, hiv, marg_caste, occupation, detection, prv_tx, 
+                consult_gt0, latitude, longitude, traveltime, traveltime_s, vill_inc_2017_t,
+                vill_inc_2017_gt0, IRS_2017_1, block_endm_2017, id, v, district, block, rain) %>%
   drop_na() 
 
 paste(n_all - nrow(dat),"observations deleted due to missingness")

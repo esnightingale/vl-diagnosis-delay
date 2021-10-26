@@ -16,101 +16,47 @@ library(mapr)
 theme_set(theme_minimal())
 figdir <- "figures/fit"
 
-dat <- readRDS(here::here("data","analysisdata_individual.rds")) %>%
-  st_set_crs(4326) %>%
-  mutate(excess_delay = as.numeric(gt90_cdf))
-# 
-# dat.spdf <- dat
-# coordinates(dat.spdf) <- ~ longitude + latitude
-# 
-# dat <- sf::st_as_sf(dat.spdf) 
+dat <- readRDS(here::here("data/analysis","dat_nona.rds")) %>%
+  st_transform(7759)
+spde <- readRDS(here::here("data/analysis","spde.rds"))
+mesh <- readRDS(here::here("data/analysis","mesh.rds"))
+coop <- readRDS(here::here("data/analysis","coop.rds"))
 
-# st_transform(crs = st_crs(24380))
+# # Setup map context
+blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) 
 
-# Setup map context
-blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
-  st_transform(4326)
-boundary <- sf::st_union(blockmap)  
-boundary.spdf <- as_Spatial(boundary)
+# boundary <- sf::st_union(blockmap)
+# boundary.spdf <- as_Spatial(boundary)
 
 extent <- setNames(st_bbox(blockmap), c("left","bottom","right","top"))
 bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
 
-# Consider only a spatial random field.
+# Consider only an intercept and a spatial random field.
 # Define the spatial random field as a zero-mean GP with matern covariance function.
 # This has a smoothness parameter nu.
 
-
 ################################################################################
-# Set up mesh
+# Set up stack
 ################################################################################
 
-# Pull coordinates
-coo <- st_coordinates(dat)
-
-# Define a mesh across the points
-
-mesh <- inla.mesh.2d(
-  loc = coo,
-  offset = c(0.2, 1),
-  max.edge = c(0.5, 2), # small triangles within the region and large around the edge
-  cutoff = 0.01) # avoid constructing many small triangles where points are close together
-
-# Number of vertices
-mesh$n
-
-ggplot() +
-  gg(mesh) +
-  gg(boundary.spdf) +
-  gg(as_Spatial(dat), col = "red", cex = 0.5) +
-  coord_fixed()
-
-#------------------------------------------------------------------------------#
-
-# Build the SPDE which corresponds to the GP over this mesh, with an integrate
-# to zero constraint.
-# Alpha is related to the smoothness parameter nu of the Matern covariance
-# function:
-#   - alpha = nu + d/2, where d = dimensions
-#   - Setting nu = 1 gives alpha = 1 + 2/2 = 2
-spde <- inla.spde2.matern(mesh = mesh, alpha = 2, constr = TRUE)
-
-#------------------------------------------------------------------------------#
-
-# Generate the index set for this SPDE
-indexs <- inla.spde.make.index("s", spde$n.spde)
-lengths(indexs)
+# Generate the index set for the SPDE
+indexv <- inla.spde.make.index("v", spde$n.spde)
+lengths(indexv)
 
 #------------------------------------------------------------------------------#
 
 # Generate a projection matrix A - projects the spatially continuous GRF from
 # the observations to the mesh nodes
+coo <- st_coordinates(dat)
 A <- inla.spde.make.A(mesh = mesh, loc = coo)
 
 dim(A)
 nrow(dat)
 
 # Repeat for nugget/IID effect
-A2 <- inla.spde.make.A(mesh = mesh, loc = coo)
+# A2 <- inla.spde.make.A(mesh = mesh, loc = coo)
 
 #------------------------------------------------------------------------------#
-
-# Define a grid of points at which to make predictions. 
-
-bb <- st_bbox(boundary)
-x <- seq(bb[1] - 1, bb[3] + 1, length.out = 200)
-y <- seq(bb[2] - 1, bb[4] + 1, length.out = 200)
-
-grid <- st_multipoint(as.matrix(expand.grid(x, y))) %>%
-  st_sfc() 
-
-coop <- st_sf(geometry = grid) %>%
-  st_set_crs(4326) %>%
-  st_intersection(boundary) %>%
-  st_coordinates() 
-
-# Remove L1 var
-coop <- coop[,1:2]
 
 # Construct another matrix that projects the continuous GRF to the prediction
 # points
@@ -135,7 +81,8 @@ stk.e <- inla.stack(
   tag = "est", 
   data = list(y = dat$days_fever),
   A = list(1, A),
-  effects = list(data.frame(b0 = rep(1, nrow(coo))), s = indexs)
+  effects = list(data.frame(b0 = rep(1, nrow(coo))), 
+                 v = indexv)
 )
 
 # stack for prediction stk.p
@@ -143,7 +90,8 @@ stk.p <- inla.stack(
   tag = "pred",
   data = list(y = NA),
   A = list(1, Ap),
-  effects = list(data.frame(b0 = rep(1, nrow(coop))), s = indexs)
+  effects = list(data.frame(b0 = rep(1, nrow(coop))), 
+                 v = indexv)
 )
 
 # stk.full has stk.e and stk.p
@@ -152,7 +100,7 @@ stk.full <- inla.stack(stk.e, stk.p)
 #------------------------------------------------------------------------------#
 
 # Model formula
-formula <- y ~ 0 + b0 + f(s, model = spde) #+ f(s2, model = "iid") # w/ nugget effect
+formula <- y ~ 0 + b0 + f(v, model = spde) 
 
 #------------------------------------------------------------------------------#
 
@@ -163,17 +111,17 @@ res <- inla(formula,
             data = inla.stack.data(stk.full),
             control.predictor = list(
               compute = TRUE, link = 1,
-              A = inla.stack.A(stk.full)
-            )
-)
+              A = inla.stack.A(stk.full)),
+            control.fixed = list(mean = 0, prec = 0.1, 
+                                 mean.intercept = 0, prec.intercept = 0.1),
+            verbose = TRUE)
 
 summary(res)
 
 autoplot(res)
-
 INLAutils::ggplot_inla_residuals(res, dat$days_fever)
 
-saveRDS(res,here::here("output","fit_base_nb.rds"))
+saveRDS(res,here::here("output","fit_base.rds"))
 
 #------------------------------------------------------------------------------#
 
@@ -188,44 +136,29 @@ med <- res$summary.fitted.values[index, "0.5quant"]
 ll <- res$summary.fitted.values[index, "0.025quant"]
 ul <- res$summary.fitted.values[index, "0.975quant"]
 
-pred <- data.frame(x = coop[,1], y = coop[,2], med = med, ll = ll, ul = ul, iqr = ul - ll) 
-# %>%
-#   tidyr::pivot_longer(-x:-y)
+coop_proj <- coop %>%
+  st_multipoint() %>%
+  st_sfc(crs = 7759) %>%
+  st_transform(4326) %>%
+  st_coordinates()
 
+pred <- data.frame(x = coop_proj[,1], y = coop_proj[,2], 
+                   med = med, 
+                   ll = ll, ul = ul) %>%
+  pivot_longer(-x:-y)
+  
+
+# Map fitted value
 ggmap(bh_lines, 
       base_layer = ggplot(data = pred,
-                          aes(x = x, y = y, fill = med))) + # , alpha = 1/iqr
-  geom_tile() +
-  # scale_alpha_continuous(trans = "log10") +
-  scale_fill_viridis_c(direction = -1, option = "plasma") + #trans = "log10", 
-  # scale_fill_gradient2(midpoint = mean(dat$days_fever), trans = "log2") +
-  labs(x = "", y = "", fill = "Median", alpha = "1/IQR") +
-  coord_fixed(ratio = 1)
+                          aes(x = x, y = y, col = value))) +
+  geom_point(alpha = 0.5) +
+  scale_colour_viridis_c(direction = -1, option = "plasma") +
+  labs(x = "", y = "", col = "Median") +
+  coord_fixed(ratio = 1) +
+  facet_wrap(~name)
 
-ggsave(here::here(figdir,"base_fit_nb.png"), height = 6, width = 9, units = "in")
-
-#------------------------------------------------------------------------------#
-# Define a raster of these values to plot
-r_mean <- raster::rasterize(
-  x = coop, y = access, field = mean, 
-)
-
-ggmap(bh_lines, 
-      base_layer = ggplot(data = r_mean, aes(x = x, y = y, fill = fct_elevation_2))) +
-  geom_raster() +
-  labs(x = "", y = "", col = "Mean") 
-
-
-pal <- colorNumeric("viridis", c(0,530), na.color = "transparent")
-
-leaflet() %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
-  addRasterImage(r_mean, colors = pal) %>%
-  addLegend("bottomright",
-            pal = pal,
-            values = values(r_mean), title = "Mean"
-  ) %>%
-  addScaleBar(position = c("bottomleft"))
+ggsave(here::here(figdir,"base_fit.png"), height = 3, width = 10, units = "in")
 
 #------------------------------------------------------------------------------#
 
@@ -233,7 +166,6 @@ leaflet() %>%
 
 # Again at prediction locations
 index <- inla.stack.index(stack = stk.full, tag = "pred")$data
-
 
 get_excprob <- function(marg){
   # exponentiate marginal distribution

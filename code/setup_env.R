@@ -9,9 +9,9 @@
 # remotes::install_github("gfalbery/ggregplot")
 
 # Packages required
-packages <- c("here","tidyverse","lubridate","gridExtra","sf","spdep","rgdal","ggspatial",
-              "ggmap","patchwork","scales","here", "gstat", "variosig", "biscale",
-              "INLA","inlabru", "ggregplot","mapr", "mgcv") #"inlatools",
+packages <- c("here","tidyverse","lubridate","gridExtra","sf","spdep","rgdal",
+              "spatstat","ggspatial","ggmap","patchwork","scales","here", "gstat", 
+              "variosig", "biscale","INLA","inlabru", "ggregplot","mapr", "mgcv") #"inlatools",
 
 # Check and install if necessary
 installed_packages <- packages %in% rownames(installed.packages())

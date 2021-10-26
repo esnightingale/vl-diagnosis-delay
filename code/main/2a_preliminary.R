@@ -34,8 +34,30 @@ access <- raster::raster(here::here("data","covariates","diag_facility_travel_ti
 # ---------------------------------------------------------------------------- #
 # Patients with negative delay
 
-dat %>%
-  
+dat.df %>%
+  mutate(delay = factor(delay < 0, 
+                        levels = c(FALSE,TRUE), 
+                        labels = c("Greater than 14 days","Less than 14 days"))) %>%
+  group_by(delay) %>%
+  summarise(N = n(),
+            mean_age = mean(age, na.rm = T),
+            median_age = median(age, na.rm = T),
+            p_child = sum(age_child == "Under 16", na.rm = T)*100/N,
+            p_female = sum(sex == "Female", na.rm = T)*100/N,
+            p_marg = sum(marg_caste == "Yes", na.rm = T)*100/N,
+            p_hiv = sum(hiv == "Yes", na.rm = T)*100/N,
+            p_prvtx = sum(prv_tx == "Yes", na.rm = T)*100/N,
+            p_acd = sum(detection == "ACD", na.rm = T)*100/N,
+            p_working = sum(occupation != "Not working", na.rm = T)*100/N,
+            p_conslt_gt1 = sum(!num_conslt %in% c(0,1), na.rm = T)*100/N,
+            p_villinc_gt0 = sum(vill_inc_2017 > 0, na.rm = T)*100/N,
+            p_irs = sum(IRS_2017 != "0", na.rm = T)*100/N,
+            p_end = sum(block_endm_2017 == "Endemic", na.rm = T)*100/N,
+            mean_travel = mean(traveltime, na.rm = T),
+            median_travel = median(traveltime, na.rm = T)) %>% 
+  tibble::column_to_rownames("delay") -> tab_negative_delay
+
+View(tab_negative_delay)
 
 # ---------------------------------------------------------------------------- #
 # Delay versus patient characteristics
@@ -74,7 +96,7 @@ create_raincloud(dat.df, "marg_caste", "days_fever",
 
 create_raincloud(dat.df, "occupation", "days_fever", 
                  xlab = "Occupation", ylab = "Days fever", 
-                 y_trans = "log2", col_by = "occupationcat", 
+                 y_trans = "log2", col_by = "occupation", 
                  drop_na = TRUE) -> plot_occ
 
 create_raincloud(dat.df, "hiv", "days_fever", 
@@ -263,8 +285,8 @@ dat.df %>%
   labs(y = "Delay (days)", x =  "Travel time (minutes)", col = "Marginalised\ncaste")
 
 dat.df %>%
-  filter(!is.na(occupationcat)) %>%
-  ggplot(aes(traveltime_adj, days_fever, col = occupationcat)) +
+  filter(!is.na(occupation)) %>%
+  ggplot(aes(traveltime_adj, days_fever, col = occupation)) +
   geom_point(alpha = 0.1) +
   geom_smooth() +
   scale_y_continuous(trans = "log2") +

@@ -1,16 +1,6 @@
 ################################################################################
 # Description: 
 # 
-# Initialise IID and SPDE models using all fitting data
-# 
-# Refit using subsampled training data and assess prediction for remaining test
-# data.
-# 
-# Want models with all covariates and with covariates in each of four domains
-# 
-# Compare domains, select strongest predictors from each
-# - Do I want this? Want to interpret each covariate or just domain contribution?
-# 
 # 
 ################################################################################
 ################################################################################
@@ -20,25 +10,34 @@ source(here::here("code","setup_env.R"))
 figdir <- "figures/fit"
 outdir <- "output"
 
-covs_pat <- c("age_s","sex","hiv")
-covs_ses <- c("marg_caste","occ4_cat")
-covs_aware <- c("block_endm_2017", "IRS_2017_1","vill_inc_2017_gt0","prv_tx")
-covs_phys <- c("traveltime_s","rain")
+covs_pat <- c("age_s","sex","hiv","prv_tx")
+covs_ses <- c("marg_caste","occupation")
+# covs_pat_aware <- c("prv_tx") #,"consult_gt0"
+covs_vil_aware <- c("block_endm_2017", "IRS_2017_1","vill_inc_2017_gt0")
+covs_access <- c("traveltime_s","rain")
 covs_ctl <- "detection"
-covs_choice <- "consult_gt1"
+# covs_choice <- "consult_gt0"
 
 covs.list <- list(None = NULL, 
                   Health = covs_pat, 
                   SES = covs_ses, 
-                  Awareness = covs_aware,
-                  Choice = covs_choice,
-                  Physical = covs_phys,
+                  Awareness = covs_pat_aware,
+                  # Choice = covs_choice,
+                  Access = covs_access,
                   Control = covs_ctl,
-                  All = c(covs_pat, covs_ses, covs_aware, covs_choice, covs_phys, covs_ctl))
+                  Patient = c(covs_pat, covs_ses, "detection"),
+                  Village = covs_vil_aware,
+                  All = c(covs_pat, covs_ses, "detection", covs_vil_aware, covs_access)) #covs_choice, covs_phys
 
-dat.fit <- readRDS(here::here("data/analysis","dat_fit.rds"))
+dat <- readRDS(here::here("data/analysis","dat_fit_val.rds"))
 mesh <- readRDS(here::here("data/analysis","mesh.rds"))
 spde <- readRDS(here::here("data/analysis","spde.rds"))
+
+blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
+  st_transform(7759)
+
+boundary <- sf::st_union(blockmap)
+boundary.spdf <- as_Spatial(boundary)
 
 #------------------------------------------------------------------------------#
 # Initialise each model with all training data
@@ -46,27 +45,53 @@ spde <- readRDS(here::here("data/analysis","spde.rds"))
 fit_covs <- function(covs.list) {
   
 # Define formula
-  f <- as.formula(paste0("days_fever ~ ", paste0(covs.list, collapse = " + "), "+ f(v, model = spde)"))
+  f <- as.formula(paste0("days_fever ~ ", 
+                         paste0(covs.list, collapse = " + "), 
+                         "+ f(v, model = 'iid',
+                             prior = 'pc.prec', 
+                             param = c(1, 0.01)) 
+                          + f(v2, model = spde)"))
 
 # Fit full models 
-  fit <- init_inla(f, 
-                   family = "poisson",
-                   data = dat.fit)
+  fit <- inla(f,
+              family = "nbinomial",
+              data = dat,
+              control.predictor = list(
+                compute = TRUE, link = 1),
+              control.compute = list(dic = TRUE, 
+                                     waic = TRUE, 
+                                     config = TRUE),
+              control.fixed = list(mean = 0, 
+                                   prec = 0.1, 
+                                   mean.intercept = 0, 
+                                   prec.intercept = 0.1),
+              verbose = TRUE)
   
   res <- list(f = f, fit = fit)
   return(res)
   
 }
 
+covs.list <- covs.list[c("None","Patient","Village","Access","All")]
 fits.init <- plyr::llply(covs.list, fit_covs)
-saveRDS(fits.init, here::here(outdir, "/base/fits_init.rds"))
+saveRDS(fits.init, here::here(outdir, "fits_covs_init.rds"))
+
+plyr::llply(fits.init, function(x) summary(x$fit))
 
 # Compare fitted regression estimates
-ggregplot::Efxplot(plyr::llply(fits.init, function(x) x$fit$fit),
+ggregplot::Efxplot(plyr::llply(fits.init, function(x) x$fit),
                    ModelNames = names(covs.list),
                    Intercept = FALSE)
 ggsave(here::here(figdir, "fits_init_efx.png"), height = 6, width = 8, units = "in", dpi = 320)
 
+#------------------------------------------------------------------------------#
+# Plot the fitted spatial fields
+
+pdf(here::here(figdir, "map_fitted_spdes.pdf"), height = 4, width = 15)
+plyr::llply(fits.init, function(x) print(plot_spde(x)))
+dev.off()
+
+#------------------------------------------------------------------------------#
 
 #----------------#
 # Spatial LOO CV #

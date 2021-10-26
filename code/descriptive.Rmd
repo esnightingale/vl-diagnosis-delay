@@ -5,7 +5,7 @@ output:
     df_print: paged
 ---
 
-Descriptive summaries of CDF data and onset ot diagnosis delay.
+Descriptive summaries of CDF data and onset to diagnosis delay.
 
 ```{r, setup}
 
@@ -19,8 +19,8 @@ figdir <- "figures/descriptive"
 
 # Load analysis data
 dat <- readRDS(here::here("data","analysisdata_individual.rds")) %>%
-  dplyr::mutate(delay_cat5 = cut(days_fever, c(0,15,30,90,180,730), include.lowest = TRUE, ordered_result = TRUE),
-                delay_cat3 = cut(days_fever, c(0,30,90,730), include.lowest = TRUE, ordered_result = TRUE)) %>%
+  dplyr::mutate(OD_cat5 = cut(days_fever, c(0,15,30,90,180,730), include.lowest = TRUE, ordered_result = TRUE),
+                OD_cat3 = cut(days_fever, c(0,30,90,730), include.lowest = TRUE, ordered_result = TRUE)) %>%
   arrange(days_fever)
 
 # Setup map context
@@ -63,38 +63,59 @@ ggsave(here::here(figdir,"map_cases.png"),
 summary(dat$days_fever)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 4.00   25.00   30.00   45.01   58.00  510.00 
-summary(dat$delay_cat5)
+summary(dat$OD_cat5)
 # [0,15]   (15,30]   (30,90]  (90,180] (180,730] 
 # 198      2284      1607       251        54 
-summary(dat$delay_cat3)
+summary(dat$OD_cat3)
 # [0,30]  (30,90] (90,730] 
 # 2482     1607      305 
 summary(dat$gt90)
 # FALSE    TRUE 
 # 4089     305
 
-```
-
-
-## Observed delays over time
-
-### Overall/by year
-```{r time_yr}
-
 dat %>%
   ggplot(aes(x = days_fever)) +
   geom_histogram(bins = 50) +
   xlim(c(0,365)) +
-  annotate("text", x = 300, y = 300, size = 2, label = "Axis cut at 365 days\nN = 3 cases with delay > 365.") +
+  geom_vline(xintercept = 14, lty = "dashed") +
+  annotate("text", x = 300, y = 300, size = 2, 
+           label = paste0("Axis cut at 365 days\nN = ",
+                          sum(dat$days_fever > 365),
+           " cases with > 365 days fever before diagnosis\nN = ",
+           sum(dat$days_fever < 14),
+           " cases with < 14 days")) +
   # facet_wrap(~diag_year) +
-  labs(x = "Onset to diagnosis (days)", y = "Frequency") -> delay_hist
-delay_hist
+  labs(x = "Onset to diagnosis (days)", y = "Frequency") -> days_fever_hist
+days_fever_hist
 
-ggsave(here::here(figdir,"delay_hist.png"),
-       delay_hist,
+ggsave(here::here(figdir,"days_fever_hist.png"),
+       days_fever_hist,
        height = 4, width = 5, units = "in")
 
 ```
+
+### Delay after 14 day fever diagnosis criteria
+
+Standard criteria for diagnosis is at least 14 days of fever, plus splenomegaly and a positive RDT. Patients diagnosed with less than 14 days of fever 
+
+```{r delay}
+summary(dat$delay < 0)
+# FALSE    TRUE 
+#  4353      25 
+summary(dat$delay[dat$delay < 0])
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# -10.00   -4.00   -3.00   -3.76   -2.00   -1.00 
+summary(dat$delay[dat$delay >= 0])
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.00   11.00   16.00   31.26   46.00  496.00 
+
+# Exclude those with less than 14 days fever before diagnosis
+
+dat <- dplyr::filter(dat, delay >= 0)
+```
+
+
+# Observed delays over time
 
 ### By month
 
@@ -119,19 +140,19 @@ by_mth %>%
   geom_point() +
   geom_line(aes(y = mean), col = "steelblue", lty = "dashed", lwd = 1.2) +
   scale_y_continuous(trans = "log2") +
-  labs(x = "Month of diagnosis", y = "Onset to diagnosis (days)") -> delay_bymth
-delay_bymth
+  labs(x = "Month of diagnosis", y = "Onset to diagnosis (days)") -> days_fever_bymth
+days_fever_bymth
 
-ggsave(here::here(figdir,"delay_bymth.png"),
-       delay_bymth,
+ggsave(here::here(figdir,"days_fever_bymth.png"),
+       days_fever_bymth,
        height = 4, width = 6, units = "in")
 
 
 pal <- viridis::viridis(3, end = 0.8, direction = -1)
 by_mth %>%
-  pivot_longer(c(`> 90 days`,`31-90 days`,`<= 30 days`), names_to = "Delay") %>%
-  mutate(Delay = factor(Delay, levels = c("<= 30 days", "31-90 days", "> 90 days"))) %>%
-  ggplot(aes(x = diag_month, y = value, fill = Delay)) +
+  pivot_longer(c(`> 90 days`,`31-90 days`,`<= 30 days`), names_to = "OD") %>%
+  mutate(`Days fever` = factor(OD, levels = c("<= 30 days", "31-90 days", "> 90 days"))) %>%
+  ggplot(aes(x = diag_month, y = value, fill = `Days fever`)) +
   geom_col() +
   scale_fill_manual(values = pal) +
   labs(x = "Month of diagnosis", y = "Proportion") -> prop_excessive
@@ -144,7 +165,7 @@ ggsave(here::here(figdir,"prop_excessive_bymth.png"),
 ```
 
 
-## Observed delays by location
+## Observed onset-diagnosis by location
 
 ### Individuals
 
@@ -160,10 +181,10 @@ ggmap(bh_lines,
       base_layer = ggplot(plotdat, aes(col = days_fever))) +
   geom_sf(alpha = 0.5, cex = 0.8) +
   scale_colour_viridis_c(trans = "log10", direction = -1, option = "plasma") +
-  labs(x = "", y = "", col = "Delay", subtitle = "Diagnoses between Jan 2018 - July 2019") -> map_village
+  labs(x = "", y = "", col = "Days fever", subtitle = "Diagnoses between Jan 2018 - July 2019") -> map_village
 map_village
 
-ggsave(here::here(figdir,"delay_individual.png"),
+ggsave(here::here(figdir,"days_fever_individual.png"),
        map_village,
        height = 7, width = 10, units = "in")
 
@@ -171,26 +192,26 @@ ggsave(here::here(figdir,"delay_individual.png"),
 ## 5 categories
 ggmap(bh_lines, 
       base_layer = ggplot(plotdat, 
-                          aes(col = delay_cat5))) +
+                          aes(col = OD_cat5))) +
   geom_sf(alpha = 0.5, cex = 0.8) +
   scale_colour_viridis_d(option = "viridis", na.value = "grey", direction = -1, end = 0.9) +
-  labs(x = "", y = "", col = "Delay") -> map_cat5
+  labs(x = "", y = "", col = "Days fever") -> map_cat5
 map_cat5
 
-ggsave(here::here(figdir, "delay_cat5.png"), 
+ggsave(here::here(figdir, "OD_cat5.png"), 
        map_cat5, 
        height = 7, width = 10, units = "in")
 
 ## 3 categories
 ggmap(bh_lines, 
       base_layer = ggplot(plotdat, 
-                          aes(col = delay_cat3))) +
+                          aes(col = OD_cat3))) +
   geom_sf(alpha = 0.8, cex = 0.8) +
   scale_colour_viridis_d(option = "viridis", na.value = "grey", direction = -1, end = 0.85) +
-  labs(x = "", y = "", col = "Delay") -> map_cat3
+  labs(x = "", y = "", col = "Days fever") -> map_cat3
 map_cat3
 
-ggsave(here::here(figdir, "delay_cat3.png"), 
+ggsave(here::here(figdir, "OD_cat3.png"), 
        map_cat3, 
        height = 6, width = 8, units = "in")
 
@@ -200,10 +221,10 @@ ggmap(bh_lines,
       base_layer = ggplot(plotdat, aes(col = gt90))) +
   geom_sf(alpha = 0.5, cex = 0.8) +
   scale_colour_manual(values = c("grey","indianred")) +
-  labs(x = "", y = "", col = "Delay > 90 days", subtitle = "Diagnoses between Jan 2018 - July 2019") -> map_excess
+  labs(x = "", y = "", col = "Onset to diagnosis\n> 90 days", subtitle = "Diagnoses between Jan 2018 - July 2019") -> map_excess
 map_excess
 
-ggsave(here::here(figdir, "delay_excess.png"), 
+ggsave(here::here(figdir, "OD_excess.png"), 
        map_excess, 
        height = 7, width = 10, units = "in")
 
@@ -231,7 +252,7 @@ ggmap(bh_lines,
   geom_sf(alpha = 0.7, pch = 19) +
   scale_colour_viridis_c(option = "viridis", na.value = "grey", direction = -1, trans = "log2", end = 0.9) +
   scale_alpha_continuous(trans = "log10") +
-  labs(x = "", y = "", col = "Median delay") -> map_medOD
+  labs(x = "", y = "", col = "Median days fever") -> map_medOD
 map_medOD
 
 ggsave(here::here(figdir, "village_median.png"), 
@@ -281,7 +302,7 @@ dat %>%
             medianOD = median(days_fever, na.rm = T),
             propgt90 = mean(gt90, na.rm = T)*100,
             propgt30 = mean(gt30, na.rm = T)*100) %>%
-  mutate(ODcat3 = cut(medianOD, c(0,15,90,730), include.lowest = TRUE, ordered_result = TRUE)) %>%
+  mutate(OD_cat3 = cut(medianOD, c(0,15,90,730), include.lowest = TRUE, ordered_result = TRUE)) %>%
   ungroup() -> by_block
 
 by_block <- blockmap %>%
@@ -296,11 +317,11 @@ ggplot() +
   geom_sf(data = blockmap) +
   geom_sf(data = by_block, aes(geometry = geometry, fill = medianOD)) +
   scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, trans = "log2", end = 0.9) +
-  labs(fill = "Median delay") + 
+  labs(fill = "Median days fever") + 
   theme(axis.text = element_blank()) -> blk_medOD
 blk_medOD
 
-ggsave(here::here(figdir, "block_medianOD.png"), blk_medOD, height = 7, width = 10, units = "in")
+ggsave(here::here(figdir, "block_median.png"), blk_medOD, height = 7, width = 10, units = "in")
 
 ggplot() +
   geom_sf(data = blockmap) +
@@ -325,14 +346,14 @@ ggsave(here::here(figdir, "block_propgt90.png"), blk_pgt90, height = 7, width = 
 
 # Join two block maps
 combined <- blk_pgt30 + blk_pgt90 +
-  plot_annotation(title = "Proportion of cases diagnosed with excess delays",
+  plot_annotation(title = "Proportion of cases diagnosed with > 30/90 days fever",
                   caption = paste0("Diagnoses between ",
                                    range(dat$diag_month)[1],
                                    " and ",
                                    range(dat$diag_month)[2]))
 combined
 
-ggsave(here::here(figdir, "excess_delay_byblock.png"), combined, height = 7, width = 14, units = "in")
+ggsave(here::here(figdir, "block_propexcessive.png"), combined, height = 7, width = 14, units = "in")
 
 ```
 
@@ -393,33 +414,44 @@ ggsave(here::here(figdir,"by quarter",paste0("block_propgt30_byinc_",q,".png")),
 }
 ```
 
-## Non-parametric analysis of delay
+## Non-parametric analysis of onset-diagnosis
 
 ```{r vgm}
 
-# dat <- filter(dat, !is.na(longitude) & !is.na(days_fever_cdf))
-
 # convert simple data frame into a spatial data frame object
 dat.spdf <- dat %>%
-    sf::st_transform(7759) %>%
+    # sf::st_transform(7759) %>%
     as_Spatial()
 
-vg <- variogram(days_fever~1, data = dat.spdf)
+vg <- variogram(days_fever~1, 
+                data = dat.spdf, 
+                cressie = TRUE)
 plot(vg)
 
-vgmod <- vgm(psill =  800, model = "Mat", nugget = 1000, range = 100)
+vgmod <- vgm(psill =  700, model = "Mat", nugget = 300, range = 100)
 plot(vg, model = vgmod)
 
 vgfit <- fit.variogram(vg, model = vgmod)    
 plot(vg, model = vgfit)
 
 vgfit
-# model    psill    range kappa
-# Nug 936.1536 0.000000   0.0
-# Mat 959.9353 0.629266   0.5
+# model    psill   range kappa
+#   Nug 338.0169  0.0000   0.0
+#   Mat 351.5204 47.7469   0.5
 
-png(here::here(figdir, "delay_semivariogram.png"), height = 500, width = 600)
-plot(vg, model = vgfit)
+plot_variogram <- function(v, m) {
+  preds = variogramLine(m, maxdist = max(v$dist))
+  ggplot() + 
+    geom_point(data = v, aes(x = dist, y = gamma), pch = 1) + #, size=np
+    geom_line(data = preds, aes(x = dist, y = gamma)) +
+    labs(y = "Cressie's semivariance",
+         x = "Distance (km)") +
+    ylim(c(0,700))
+}
+
+png(here::here(figdir, "days_fever_semivariogram.png"), 
+    height = 500, width = 600)
+plot_variogram(vg, vgfit) 
 dev.off()
 
 ```

@@ -9,10 +9,9 @@ outdir <- "output"
 #------------------------------------------------------------------------------#
 # Fit three models: fixed effect only, with IID random effects and with spde on village
 
-
 f1 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + ")))
 f2 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(id, model = 'iid')"))
-f3 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(id, model = 'iid') + f(s, model = spde)"))
+f3 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(id, model = 'iid') + f(v, model = spde)"))
 
 fit.fixed <- inla(f1,
                 family = "poisson",

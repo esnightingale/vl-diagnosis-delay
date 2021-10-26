@@ -41,15 +41,19 @@ summary(dat)
 
 # Setup map context
 blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) 
-boundary <- sf::st_union(blockmap)  %>%
-  st_transform(crs = st_crs(24380))
+boundary <- sf::st_union(blockmap)  
+saveRDS(boundary, here::here("data","geography","boundary.rds"))
+
+boundary %>%
+  st_transform(crs = st_crs(7759))
+
 extent <- setNames(st_bbox(blockmap), c("left","bottom","right","top"))
 bh_lines <- ggmap::get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
 
 # Transform to India projection so that buffer is calculated accurately
 dat.sf <- st_as_sf(dat, coords = c("longitude","latitude"), remove = FALSE) %>%
   st_set_crs(4326) %>%
-  st_transform(24380)
+  st_transform(7759)
 
 buffer <- st_buffer(boundary, 1e4)
 
