@@ -12,8 +12,8 @@ outdir <- "output/exploratory"
 dat <- readRDS(here::here("data/analysis","dat_nona.rds"))  %>%
   st_transform(7759) %>%
   filter(detection == "PCD")
-# spde <- readRDS(here::here("data/analysis","spde.rds"))
-# mesh <- readRDS(here::here("data/analysis","mesh.rds"))
+
+mesh <- readRDS(here::here("data/analysis","mesh.rds"))
 
 # Setup map context
 blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
@@ -27,6 +27,91 @@ boundary.spdf <- as_Spatial(boundary)
 extent <- setNames(st_bbox(blockmap), c("left","bottom","right","top"))
 bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
 
+
+################################################################################
+# Define data stack
+################################################################################
+
+# Shorter range - 5km
+spde1 <- inla.spde2.pcmatern(mesh = mesh, 
+                            prior.range = c(5000, 0.01), # P(range < U) = a
+                            prior.sigma = c(1.5, 0.1), # P(sigma > U) = a
+                            constr = TRUE)
+
+# Longer range - 50km
+spde2 <- inla.spde2.pcmatern(mesh = mesh, 
+                             prior.range = c(5e5, 0.01), # P(range < U) = a
+                             prior.sigma = c(1.5, 0.1), # P(sigma > U) = a
+                             constr = TRUE)
+
+# Smaller sigma
+spde3 <- inla.spde2.pcmatern(mesh = mesh, 
+                             prior.range = c(5000, 0.01), # P(range < U) = a
+                             prior.sigma = c(1.1, 0.1), # P(sigma > U) = a
+                             constr = TRUE)
+
+# Greater sigma
+spde4 <- inla.spde2.pcmatern(mesh = mesh, 
+                             prior.range = c(5000, 0.01), # P(range < U) = a
+                             prior.sigma = c(2, 0.1), # P(sigma > U) = a
+                             constr = TRUE)
+
+#------------------------------------------------------------------------------#
+# Generate the index set for this SPDE
+
+s1 <- inla.spde.make.index("s", spde1$n.spde)
+s2 <- inla.spde.make.index("s", spde2$n.spde)
+s3 <- inla.spde.make.index("s", spde3$n.spde)
+s4 <- inla.spde.make.index("s", spde4$n.spde)
+
+#------------------------------------------------------------------------------#
+# Generate a projection matrix A - projects the spatially continuous GRF from
+# the observations to the mesh nodes
+
+# For training points
+coo <- st_coordinates(dat)
+A <- inla.spde.make.A(mesh = mesh, loc = coo)
+
+dim(A)
+nrow(dat)
+
+# Define model matrix based on all covariates of interest, removing automatic 
+# intercept
+X <- model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))), 
+                  data = dat)[,-1] 
+
+# Training stack
+stk.train <- inla.stack(
+  tag = "train",
+  data = list(y = dat$days_fever),
+  A = list(A, 1, 1),
+  effects = list(s = indexs,  # the spatial index,
+                 v = dat$v,
+                 data.frame(  # covariates
+                   Intercept = 1, 
+                   X)
+  )
+)
+
+# Prediction points
+Ap <- inla.spde.make.A(mesh = mesh, loc = coop)
+
+# Stack for smooth prediction from intercept and fitted spatial field (no covariates)
+stk.pred <- inla.stack(
+  tag = "pred",
+  data = list(y = NA),
+  A = list(Ap, 1),
+  effects = list(s = indexs,
+                 data.frame(
+                   Intercept = rep(1, nrow(coop)))
+  )
+)
+
+stk.full <- inla.stack(stk.train, stk.pred)
+
+
+################################################################################
+################################################################################
 # ---------------------------------------------------------------------------- #
 # Fit baseline models with SPDE and IID to explain spatial structure
 

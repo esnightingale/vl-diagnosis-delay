@@ -66,7 +66,7 @@ plot.vgm.raw
 f1 <- y ~ -1 + Intercept + f(v, model = 'iid',
                              prior = "pc.prec", 
                              param = c(1, 0.01)) 
-f2 <- y ~ -1 + Intercept + f(v, model = spde)
+f2 <- y ~ -1 + Intercept + f(s, model = spde)
 f.list <- list(IID = f1, SPDE = f2)
 
 # Fit models
