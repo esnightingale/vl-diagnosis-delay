@@ -7,9 +7,10 @@
 ################################################################################
 
 # Bihar state boundary
-boundary <- readRDS(here::here("data","geography","boundary.rds")) %>%
-  st_transform(crs = st_crs(7759)) %>%
-  as_Spatial()
+boundary <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
+  sf::st_transform(7759) %>%
+  sf::st_union() 
+# %>% st_transform(4326)
 
 # Define mesh using all data
 dat.train <- readRDS(here::here("data/analysis","dat_nona.rds")) %>%
@@ -52,7 +53,7 @@ mesh$n
 
 ggplot() +
   gg(mesh) +
-  gg(boundary) +
+  gg(as.Spatial(boundary)) +
   # gg(as_Spatial(dat.fit), col = "red", cex = 0.5) +
   coord_fixed() +
   labs(x = "", y = "") +
@@ -96,12 +97,6 @@ saveRDS(spde, here::here("data/analysis","spde.rds"))
 
 #------------------------------------------------------------------------------#
 # Define a grid of points at which to make predictions 
-
-# State boundary
-boundary <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
-  sf::st_transform(7759) %>%
-  sf::st_union() 
-# %>% st_transform(4326)
 
 bnd.sfc <- st_multipoint(bnd$loc) %>%
   st_sfc() %>%

@@ -8,6 +8,13 @@ spde <- readRDS(here::here("data/analysis","spde.rds"))
 mesh <- readRDS(here::here("data/analysis","mesh.rds"))
 coop <- readRDS(here::here("data/analysis","coop.rds"))
 
+# Setup map context
+blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
+  sf::st_transform(7759)
+
+boundary <- blockmap %>%
+  sf::st_union()
+
 # Covariates of interest
 covs <- c("age_s","sex","hiv",
           "marg_caste","occupation",
@@ -24,70 +31,82 @@ lengths(indexs)
 #------------------------------------------------------------------------------#
 # Split training and testing data
 
-# Random partition
-# test.idx <- sample(1:nrow(dat), floor(nrow(dat)*test.size))
-# 
-# dat.train <- dat[-test.idx,]
-# dat.test <- dat[test.idx,]
-
 # Spatial partition
-make_spatial_partition <- function(data, r = 1e5) {
+make_spatial_partition <- function(data, r = 1e4) { # sample 1 village, default 10km radius
   
-  # Randomly sample one observation from data
+  # villages <- distinct(dplyr::select(data, v, geometry))
+  
+  # Randomly sample n.start observations
   samp <- sample_n(data, 1)
+  # print(paste0("Sampled village ID: ",samp$v))
   
-  # Define buffer of radius r around observation
+  # Define buffer of radius r around sampled observation(s)
   buff <- st_buffer(samp, dist = r)
   
   # Intersect full dataset with buffer
-  index <- st_intersects(data, buff, sparse = FALSE)
+  p.index <- st_intersects(data, buff, sparse = FALSE)
+  print(summary(p.index))
   
-  train <- data[-index,]
-  test <- data[index,]
+  return(p.index)
   
-  return(list(train = train, test = test))
+  # train <- data[!index,]
+  # test <- data[index,]
+  # 
+  # return(list(train = train, test = test))
   
 }
 
-make_village_partition <- function(data, p = 0.1) {
-  
-  # Randomly sample (100*p)% of villages from data
-  n_samp <- round(n_distinct(data$v)*p)
-  print(n_samp)
-  samp <- sample(unique(data$v), n_samp)
-  
-  # Exclude all observations in those villages
-  train <- data[!data$v %in% samp,]
-  test <- data[data$v %in% samp,]
-  
-  return(list(train = train, test = test))
-  
-}
+
+# make_village_partition <- function(data, p = NULL, n = NULL) {
+# 
+#   # Randomly sample fixed number or proportion (100*p)% of villages from data
+#   if (is.null(n)){
+#     n_samp <- round(n_distinct(data$v)*p)
+#     print(n_samp)
+#   }elseif (!is.null(p)){ n_samp <- n 
+#   }else {print("Provide n or p")}
+# 
+#   samp <- sample(unique(data$v), n_samp)
+#   # print(length(samp))
+# 
+#   # Exclude all observations in those villages
+#   train <- dat[!dat$v %in% samp,]
+#   test <- dat[dat$v %in% samp,]
+# 
+#   return(list(train = train, test = test))
+# 
+# }
 
 M = 10
-partitions <- lapply(1:M, make_village_partition, data = dat, p = 0.1)
-saveRDS(partitions, here::here("data/analysis",paste0("village_partition_",M,".rds")))
+partitions <- lapply(1:M, function(x) make_spatial_partition(data = dat, r = 5e3))
+# partitions <- lapply(1:M, make_village_partition, data = dat, n = 10) 
+saveRDS(partitions, here::here("data/analysis",paste0("village_radius_partition_",M,".rds")))
 
-plot_partition <- function(part) {
+plot_partition <- function(data, p.index) {
+  
+  train <- data[!p.index,]
+  test <- data[p.index,]
+  
   ggplot() +
     gg(as_Spatial(boundary)) +
-    gg(as_Spatial(part$train)) +
-    gg(as_Spatial(part$test), col = "red") -> p
+    gg(as_Spatial(train), cex = 1, pch = 1) +
+    gg(as_Spatial(test), col = "red", cex = 1) -> p
   
   print(p)
 }
 
-pdf(here::here("figures","fit","spatial_partition.pdf"))
-lapply(partitions, plot_partition)
+pdf(here::here("figures","fit","cross-validation","spatial_partition.pdf"),
+    height = 9, width = 12)
+lapply(partitions, function(p.index) plot_partition(dat, p.index))
 dev.off()
 
 # ---------------------------------------------------------------------------- #
 
-# Define function to make stacks from given train/test partition
-make_stacks <- function(dat.partition) {
+# Define function to make stacks from given train/test partition index
+make_stacks <- function(data, p.index) {
 
-  dat.train <- dat.partition$train
-  dat.test <- dat.partition$test
+  dat.train <- data[!p.index,]
+  dat.test <- data[p.index,]
   
 #------------------------------------------------------------------------------#
 # Generate a projection matrices A - projects the spatially continuous GRF from
@@ -109,11 +128,12 @@ make_stacks <- function(dat.partition) {
   stk.train <- inla.stack(
     tag = "train",
     data = list(y = dat.train$days_fever),
-    A = list(A, 1),
-    effects = list(v = indexv,  # the spatial index,
-                   data.frame(  # covariates
-                     Intercept = 1, 
-                     X1)
+                A = list(A, 1, 1),
+                effects = list(s = indexs,  # the spatial index,
+                               v = dat.train$v,
+                               data.frame(  # covariates
+                                Intercept = 1, 
+                                X1)
     )
   )
   
@@ -124,14 +144,16 @@ make_stacks <- function(dat.partition) {
   stk.pred <- inla.stack(
     tag = "pred",
     data = list(y = NA),
-    A = list(Ap, 1),
-    effects = list(v = indexv,
-                   data.frame(
-                     Intercept = rep(1, nrow(coop)))
-    )
+                A = list(Ap, 1),
+                effects = list(s = indexs,
+                               data.frame(
+                                 Intercept = rep(1, nrow(coop)))
+                )
   )
   
   if (nrow(dat.test) > 0){
+    print(nrow(dat.test))
+    
     # Testing
     coot <- st_coordinates(dat.test)
     At <- inla.spde.make.A(mesh = mesh, loc = coot)
@@ -145,12 +167,13 @@ make_stacks <- function(dat.partition) {
     # Testing stack
     stk.test <- inla.stack(
       tag = "test",
-      data = list(y = dat.test$days_fever),
-      A = list(A, 1),
-      effects = list(v = indexv,  # the spatial index,
-                     data.frame(  # covariates
-                       Intercept = 1, 
-                       X2)
+      data = list(y = NA),
+                  A = list(At, 1, 1),
+                  effects = list(s = indexs,  # the spatial index,
+                                 v = dat.test$v,
+                                 data.frame(  # covariates
+                                   Intercept = 1, 
+                                   X2)
       )
     )
 
@@ -161,11 +184,17 @@ make_stacks <- function(dat.partition) {
     stk.full <- inla.stack(stk.train, stk.pred)
     
   }
-  return(stk.full)
+  return(list(stack = stk.full, p.index = p.index))
 }
 
-dat.full <- list(train = dat, test = NULL)
-stk.full <- make_stacks(dat.full)
+stk.partitions <- lapply(partitions, function(p.index) make_stacks(data = dat, p.index = p.index))
+
+saveRDS(stk.partitions, 
+        here::here("data/analysis","stack_partitions.rds"))
+
+# Setup full stack with no testing data
+stk.full <- make_stacks(dat, p.index = rep(FALSE, nrow(dat)))
+saveRDS(stk.full, here::here("data/analysis","stack.rds"))
 
 ################################################################################
 ################################################################################

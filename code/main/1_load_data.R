@@ -5,11 +5,14 @@
 
 source(here::here("code","setup_env.R"))
 
+# Local data folder
+datadir <- "C:/Users/phpuenig/Documents/VL/Data/Analysis"
+
 # Proportion to withhold from fitting for final validation
 val.size <- 0.25
 
 # Read data and define final variables for modelling
-dat <- readRDS(here::here("data","analysisdata_individual.rds")) %>%
+dat <- readRDS(file.path(datadir,"analysisdata_individual.rds")) %>%
   mutate(le30 = as.numeric(days_fever <= 30),
          id = row_number(),
          v = as.numeric(as.factor(vil_code)),
@@ -32,7 +35,7 @@ dat <- dat %>%
                 vill_inc_2017_gt0, IRS_2017_1, block_endm_2017, id, v, district, block, rain) %>%
   drop_na() 
 
-paste(n_all - nrow(dat),"observations deleted due to missingness")
+print(paste(n_all - nrow(dat),"observations deleted due to missingness"))
 # "84 observations deleted due to missingness"
 saveRDS(dat, here::here("data/analysis","dat_nona.rds"))
 

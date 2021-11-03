@@ -4,7 +4,10 @@
 ################################################################################
 ################################################################################
 
-dat <- readRDS(here::here("data","kamis_cdf.rds")) %>%
+# Local data folder
+datadir <- "C:/Users/phpuenig/Documents/VL/Data/Analysis"
+
+dat <- readRDS(file.path(datadir,"kamis_cdf.rds")) %>%
   dplyr::filter(with_gps) %>% 
   dplyr::rename(marg_caste = caste4_r) %>%
   dplyr::mutate(age_child = factor(as.numeric(age_cdf < 16), levels = c(1, 0), labels = c("Under 16", "16+")),
@@ -13,7 +16,7 @@ dat <- readRDS(here::here("data","kamis_cdf.rds")) %>%
                                     "0" = "Not working",
                                     "1" = "Unskilled",
                                     "2" = "Skilled",
-                                    "3" = "Salaried/self-employed"),
+                                    "3" = "Salaried.selfemployed"),
                 prv_tx = factor((prv_tx_ka == "Yes" | prvtx_pkdl == "Yes"), levels = c(FALSE,TRUE), labels = c("No","Yes")),
                 conslt_cat = factor(cut(num_conslt, breaks = c(0,2,5,8), include.lowest = TRUE)),
                 num_conslt = as.factor(num_conslt),
@@ -44,11 +47,11 @@ blockmap <- readRDS(here::here("data","geography","bihar_block.rds"))
 boundary <- sf::st_union(blockmap)  
 saveRDS(boundary, here::here("data","geography","boundary.rds"))
 
-boundary %>%
-  st_transform(crs = st_crs(7759))
-
 extent <- setNames(st_bbox(blockmap), c("left","bottom","right","top"))
 bh_lines <- ggmap::get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
+
+boundary %>%
+  st_transform(crs = st_crs(7759)) -> boundary
 
 # Transform to India projection so that buffer is calculated accurately
 dat.sf <- st_as_sf(dat, coords = c("longitude","latitude"), remove = FALSE) %>%
@@ -96,7 +99,7 @@ dat_clean <- dat_incl %>%
 # Note: one patient in study data (IN/BI/ARR/BHA/2018/05/003) from BAIJUPATTI village in 
 # DHANESHARI HSC which has missing population size - excluded.
 
-vil_inc <- readRDS(here::here("data","kamis.rds")) %>%
+vil_inc <- readRDS(file.path(datadir,"kamis.rds")) %>%
   dplyr::filter(!is.na(vil_code) & !is.na(population) & diag_year != 2021) %>%
   dplyr::group_by(diag_year, vil_code, latitude, longitude, population) %>%
   dplyr::count() %>%
@@ -119,7 +122,7 @@ dat_clean %>%
 # ---------------------------------------------------------------------------- #
 # Add village IRS targeting and block endemicity
 
-village_chars <- readRDS(here::here("data","village_irs_endemicity.rds")) %>% 
+village_chars <- readRDS(file.path(datadir,"village_irs_endemicity.rds")) %>% 
   dplyr::mutate(vil_code = as.factor(vil_code),
                 IRS_2015 = as.factor(IRS_2015_R1 + IRS_2015_R2),
                 IRS_2016 = as.factor(IRS_2016_R1 + IRS_2016_R2),
@@ -221,11 +224,11 @@ dat_wchars %>%
 # ---------------------------------------------------------------------------- #
 # Save analysis datasets
 
-saveRDS(dat_wchars, here::here("data","analysisdata_individual.rds"))
+saveRDS(dat_wchars, file.path(datadir,"analysisdata_individual.rds"))
 
-saveRDS(dat_village_yr, here::here("data","analysisdata_village_year.rds"))
+saveRDS(dat_village_yr, file.path(datadir,"analysisdata_village_year.rds"))
 
-saveRDS(dat_village_tot, here::here("data","analysisdata_village.rds"))
+saveRDS(dat_village_tot, file.path(datadir,"analysisdata_village.rds"))
 
 ################################################################################
 ################################################################################
