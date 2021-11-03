@@ -1,5 +1,5 @@
 ## PIT HISTOGRAM ##
-pit_hist <- function(fit, bins = 30){
+pit_hist <- function(fit, bins = 30, title = ""){
   print(summary(fit$cpo$failure))
   plotdata <- data.frame(pit = fit$cpo$pit)
   return(
@@ -8,6 +8,7 @@ pit_hist <- function(fit, bins = 30){
       geom_hline(yintercept = 1, lty = "dashed", col = "red") + 
       ylim(0,1.5) +
       theme_minimal()+ 
-      labs(x = "Probability Integral Transform (PIT)", y = "Density")
+      labs(x = "Probability Integral Transform (PIT)", y = "Density",
+           title = title)
   )
 }

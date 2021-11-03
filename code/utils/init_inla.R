@@ -1,4 +1,4 @@
-init_inla <- function(f, data = NULL, data.stack = NULL, family){
+init_inla <- function(f, data = NULL, data.stack = NULL, family, cpo = FALSE){
   
   if (!is.null(data.stack)){
     fit <- inla(f,
@@ -9,7 +9,8 @@ init_inla <- function(f, data = NULL, data.stack = NULL, family){
                   A = inla.stack.A(data.stack)),
                 control.compute = list(dic = TRUE, 
                                        waic = TRUE, 
-                                       config = TRUE),
+                                       config = TRUE,
+                                       cpo = cpo),
                 control.fixed = list(mean = 0, 
                                      prec = 0.1, 
                                      mean.intercept = 0, 
@@ -23,7 +24,8 @@ init_inla <- function(f, data = NULL, data.stack = NULL, family){
                   compute = TRUE, link = 1),
                 control.compute = list(dic = TRUE, 
                                        waic = TRUE, 
-                                       config = TRUE),
+                                       config = TRUE,
+                                       cpo = cpo),
                 control.fixed = list(mean = 0, 
                                      prec = 0.1, 
                                      mean.intercept = 0, 
