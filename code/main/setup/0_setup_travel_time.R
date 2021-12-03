@@ -66,46 +66,74 @@ ggplot() +
 
 ggsave(here::here("figures","covariates","facilities.png"), map_facilities, height = 5, width = 7, units = "in")
 
-# Extract only those with diagnosis capacity
+# Extract only those with diagnosis/treatment capacity
 diag.facility <- facility[facility@data$diag == "YES",]
+trt.facility <- facility[facility@data$trt == "YES",]
 
 # Convert to matrix of lat/long
-points <- as.matrix(diag.facility@coords)
+dpoints <- as.matrix(diag.facility@coords)
+tpoints <- as.matrix(trt.facility@coords)
 
 # ---------------------------------------------------------------------------- #
 
 # Calculate travel times via the "accumulated cost surface" algorithm
-access.raster <- gdistance::accCost(Tmat.GC, diag.facility)
+access.diag <- gdistance::accCost(Tmat.GC, diag.facility)
+access.diag <- raster::crop(access.diag, bh.shp)
 
 # Save raster of travel time to facility
-raster::writeRaster(access.raster, here::here("data","covariates","diag_facility_travel_time.tif"), overwrite = TRUE)
+raster::writeRaster(access.diag, here::here("data","covariates","diag_facility_travel_time.tif"), overwrite = TRUE)
+
+# Calculate travel times via the "accumulated cost surface" algorithm
+access.trt <- gdistance::accCost(Tmat.GC, trt.facility)
+access.trt <- raster::crop(access.trt, bh.shp)
+
+# Save raster of travel time to facility
+raster::writeRaster(access.trt, here::here("data","covariates","trt_facility_travel_time.tif"), overwrite = TRUE)
 
 # ---------------------------------------------------------------------------- #
 
 # Redefine infinite values as NA to avoid showing in plot
-access.raster@data@values[is.infinite(access.raster@data@values)] <- NA
+access.diag@data@values[is.infinite(access.diag@data@values)] <- NA
+access.trt@data@values[is.infinite(access.trt@data@values)] <- NA
 
 # Plot constructed surface
-p <- malariaAtlas::autoplot_MAPraster(access.raster, 
+dp <- malariaAtlas::autoplot_MAPraster(access.diag, 
                                       shp_df = bh.shp, printed = F)
+tp <- malariaAtlas::autoplot_MAPraster(access.trt, 
+                                       shp_df = bh.shp, printed = F)
 
-full_plot <- p[[1]] +
+plot_diag <- dp[[1]] +
   theme(axis.title = element_blank(),
         axis.text = element_blank(),
         panel.border = element_rect(fill = NA, colour = "white"),
         panel.background = element_rect(fill = "white", colour = "white")) +
-  scale_fill_viridis_c(trans = "sqrt") +
-  labs(title = "Travel time to most accessible health facility",
+  scale_fill_viridis_c(trans = "sqrt", na.value = "white") +
+  labs(title = "Travel time to most accessible diagnosis facility",
+       fill = "Minutes \nof travel")
+plot_trt <- tp[[1]] +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        panel.border = element_rect(fill = NA, colour = "white"),
+        panel.background = element_rect(fill = "white", colour = "white")) +
+  scale_fill_viridis_c(trans = "sqrt", na.value = "white") +
+  labs(title = "Travel time to most accessible treatment facility",
        fill = "Minutes \nof travel")
 
-print(full_plot)
-ggsave(here::here("figures","covariates","traveltime.png"), full_plot, height = 5, width = 7, units = "in")
+plot_diag / plot_trt
+
+ggsave(here::here("figures","covariates","traveltime.png"), height = 12, width = 7, units = "in")
 
 # Overlay facility locations
-full_plot <- full_plot +
+plot_diag2 <- plot_diag +
   geom_point(data = data.frame(diag.facility@coords), aes(x = x, y = y),
            col = "white", cex = 0.8) 
-ggsave(here::here("figures","covariates","traveltime_wfacilities.png"), full_plot, height = 5, width = 7, units = "in")
+plot_trt2 <- plot_trt +
+  geom_point(data = data.frame(trt.facility@coords), aes(x = x, y = y),
+             col = "white", cex = 0.8) 
+
+plot_diag2 / plot_trt2
+
+ggsave(here::here("figures","covariates","traveltime_wfacilities.png"), height = 12, width = 7, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # 

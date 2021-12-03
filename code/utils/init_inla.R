@@ -4,6 +4,7 @@ init_inla <- function(f, data = NULL, data.stack = NULL, family, cpo = FALSE){
     fit <- inla(f,
                 family = family,
                 data = inla.stack.data(data.stack),
+                Ntrials = 1,
                 control.predictor = list(
                   compute = TRUE, link = 1,
                   A = inla.stack.A(data.stack)),
@@ -20,6 +21,7 @@ init_inla <- function(f, data = NULL, data.stack = NULL, family, cpo = FALSE){
     fit <- inla(f,
                 family = family,
                 data = data,
+                Ntrials = 1,
                 control.predictor = list(
                   compute = TRUE, link = 1),
                 control.compute = list(dic = TRUE, 

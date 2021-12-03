@@ -53,7 +53,7 @@ mesh$n
 
 ggplot() +
   gg(mesh) +
-  gg(as.Spatial(boundary)) +
+  gg(as_Spatial(boundary)) +
   # gg(as_Spatial(dat.fit), col = "red", cex = 0.5) +
   coord_fixed() +
   labs(x = "", y = "") +

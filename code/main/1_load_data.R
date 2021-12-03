@@ -6,34 +6,37 @@
 source(here::here("code","setup_env.R"))
 
 # Local data folder
-datadir <- "C:/Users/phpuenig/Documents/VL/Data/Analysis"
+datadir <- "C:/Users/phpuenig/Documents/VL/Data/KAMIS/Clean/linelist"
 
 # Proportion to withhold from fitting for final validation
 val.size <- 0.25
 
 # Read data and define final variables for modelling
 dat <- readRDS(file.path(datadir,"analysisdata_individual.rds")) %>%
-  mutate(le30 = as.numeric(days_fever <= 30),
-         id = row_number(),
-         v = as.numeric(as.factor(vil_code)),
-         rain = as.numeric(diag_rainseason),
-         age_s = as.numeric(scale(age, center = T)),
-         consult_gt0 = (num_conslt != "0"),
-         traveltime_s = as.numeric(scale(traveltime, center = T)),
-         IRS_2017_1 = factor((IRS_2017 != 0), labels = c("No","Yes")),
-         vill_inc_2017_t = vill_inc_2017*1e3 + 1e-4,
-         vill_inc_2017_s = as.numeric(scale(vill_inc_2017, center = T)),
-         vill_inc_2017_gt0 = factor((replace_na(vill_inc_2017,0) > 0), labels = c("No","Yes")))
+  dplyr::mutate(le30 = as.numeric(days_fever <= 30),
+                id = row_number(),
+                v = as.numeric(as.factor(vil_code)),
+                rain = as.numeric(diag_rainseason),
+                age_s = as.numeric(scale(age, center = T)),
+                consult_gt0 = (num_conslt != "0"),
+                traveltime_s = as.numeric(scale(traveltime, center = T)),
+                traveltime_t_s = as.numeric(scale(traveltime_t, center = T)),
+                IRS_2017 = factor((IRS_2017 != 0), labels = c("No","Yes")),
+                inc_2017_t = inc_2017*1e3 + 1e-4,
+                inc_2017_s = as.numeric(scale(inc_2017, center = T)),
+                inc_2017_gt0 = factor((replace_na(inc_2017,0) > 0), labels = c("No","Yes")),
+                vl_affect_1517 = factor(vl_affect_1517, levels = c(0,1), labels = c("No","Yes")))
 
 # ---------------------------------------------------------------------------- #
 # Exclude observations missing any covariate of interest
 
 n_all <- nrow(dat)
 dat <- dat %>%
-  dplyr::select(days_fever, age_s, sex, hiv, marg_caste, occupation, detection, prv_tx, 
-                consult_gt0, latitude, longitude, traveltime, traveltime_s, vill_inc_2017_t,
-                vill_inc_2017_gt0, IRS_2017_1, block_endm_2017, id, v, district, block, rain) %>%
-  drop_na() 
+  dplyr::select(delay, days_fever, age_s, sex, hiv, marg_caste, occupation, detection, prv_tx, 
+                consult_gt0, latitude, longitude, traveltime, traveltime_s, traveltime_t_s, inc_2017_t,
+                inc_2017_gt0, IRS_2017, block_endm_2017, id, v, district, block, rain, geometry) %>%
+  drop_na() %>%
+  st_as_sf()
 
 print(paste(n_all - nrow(dat),"observations deleted due to missingness"))
 # "84 observations deleted due to missingness"

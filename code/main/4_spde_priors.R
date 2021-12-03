@@ -92,7 +92,7 @@ X <- model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))),
 # Make stack
 
 stk <- inla.stack(
-  data = list(y = dat$days_fever),
+  data = list(y = dat$delay),
   A = list(A, 1, 1),
   effects = list(s = indexs,  # the spatial index,
                  v = dat$v,
@@ -102,7 +102,7 @@ stk <- inla.stack(
   )
 )
 
-saveRDS(stk, here::here("data/analysis","stack.rds"))
+# saveRDS(stk, here::here("data/analysis","stack.rds"))
 
 # ---------------------------------------------------------------------------- #
 # Fit baseline IID model 
@@ -164,14 +164,14 @@ plyr::llply(fits, function(x) x$fit$summary.hyperpar[,c(1,3,5)])
 
 # Project fitted SPDEs
 pdf(here::here(figdir, "compare_spde_priors.pdf"), height = 7, width = 10) 
-plyr::llply(fits, function(x) plot_spde(x$fit))
+purrr::imap(fits, function(x, nm) plot_spde(x$fit, nm, limit1 = c(-1,1), limit2 = c(0,0.5))) 
 dev.off()
 
 names(fits) <- c("R5e3-Sig1.5", 
                  "R5e5-Sig1.5", 
                  "R5e3-Sig1.1", 
                  "R5e3-Sig2")
-p.list <- purrr::imap(fits, function(x, nm) plot_spde(x$fit, nm, limit.mean = c(-0.8,0.8), limit.sd = c(0,0.5))) 
+p.list <- purrr::imap(fits, function(x, nm) plot_spde(x$fit, nm, limit1 = c(-1,1), limit2 = c(0,0.5))) 
 
 png(here::here(figdir, "compare_spde_priors.png"), height = 4000, width = 8000, res = 350) 
 gridExtra::grid.arrange(grobs = p.list) #plyr::llply(fits, function(x) plot_spde(x$fit))

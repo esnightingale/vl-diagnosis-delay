@@ -1,4 +1,7 @@
-plot_spde <- function(res, title = "Fitted SPDE", limit.mean = NULL, limit.sd = NULL) {
+plot_spde <- function(res, title = "Fitted SPDE",
+                      stat = "mean",
+                      limit1 = NULL, limit2 = NULL) {
+  
   rang <- apply(mesh$loc[, c(1, 2)], 2, range)
   
   proj <- inla.mesh.projector(mesh, 
@@ -6,37 +9,70 @@ plot_spde <- function(res, title = "Fitted SPDE", limit.mean = NULL, limit.sd = 
                               ylim = rang[, 2], 
                               dims = c(300, 300))
   
-  mean_i <- inla.mesh.project(proj, res$summary.random$s$mean)
-  sd_i <- inla.mesh.project(proj, res$summary.random$s$sd)
-  
   df <- expand.grid(x = proj$x, y = proj$y)
-  df$mean_i <- as.vector(mean_i)
-  df$sd_i <- as.vector(sd_i)
   
+  if (stat == "mean"){
+  v1 <- inla.mesh.project(proj, res$summary.random$s$mean)
+  v2 <- inla.mesh.project(proj, res$summary.random$s$sd)
+
+  df <- df %>%
+    mutate(v1 = as.vector(v1),
+           v2 = as.vector(v2))
+  
+  stt <- c("Mean","Stdev")
+  
+  }else if (stat == "quantile"){
+    v1 <- inla.mesh.project(proj, res$summary.random$s$`0.025quant`)
+    v2 <- inla.mesh.project(proj, res$summary.random$s$`0.5quant`)
+    v3 <- inla.mesh.project(proj, res$summary.random$s$`0.975quant`)
+
+    df <- df %>%
+      mutate(v1 = as.vector(v1),
+             v2 = as.vector(v2),
+             v3 = as.vector(v3))
+
+    stt <- c("2.5%","Median","97.5%")
+  }
+
   pal <- viridis::viridis(2)
-  gmean <- ggplot() + 
-    geom_raster(data = df, aes(x = x, y = y, fill = mean_i)) +
+  g1 <- ggplot() + 
+    geom_raster(data = df, aes(x = x, y = y, fill = v1)) +
     gg(boundary.spdf, fill = "transparent") +
-    scale_fill_viridis_c(na.value = "transparent", limits = limit.mean) +
-    labs(subtitle = "Mean",
+    scale_fill_viridis_c(na.value = "transparent", limits = limit1) +
+    labs(subtitle = stt[1],
          fill = "",
          x = "", y = "") +
     # scale_fill_gradient2(na.value = "transparent", low = pal[1], mid = "white", high = pal[2]) +
     coord_fixed(ratio = 1) + 
     theme_bw()
   
-  gsd <- ggplot() + 
-    geom_raster(data = df, aes(x = x, y = y, fill = sd_i)) +
+  g2 <- ggplot() + 
+    geom_raster(data = df, aes(x = x, y = y, fill = v2)) +
     gg(boundary.spdf, fill = "transparent") +
-    scale_fill_viridis_c(na.value = "transparent", limits = limit.sd) +
-    labs(subtitle = "Stdev",
+    scale_fill_viridis_c(na.value = "transparent", limits = limit2) +
+    labs(subtitle = stt[2],
          fill = "",
          x = "", y = "") +
     coord_fixed(ratio = 1) + 
     theme_bw()
   
-  plots <- cowplot::plot_grid(gmean, gsd)
+  plots <- cowplot::plot_grid(g1, g2)
   
+  if (stat == "quantile"){
+    g3 <- ggplot() +
+      geom_raster(data = df, aes(x = x, y = y, fill = v3)) +
+      gg(boundary.spdf, fill = "transparent") +
+      scale_fill_viridis_c(na.value = "transparent", limits = limit1) +
+      labs(subtitle = stt[3],
+           fill = "",
+           x = "", y = "") +
+      coord_fixed(ratio = 1) +
+      theme_bw()
+
+    plots <- cowplot::plot_grid(g1,g2,g3) #, nrow = 1
+
+  }
+
   title <- cowplot::ggdraw() + 
     cowplot::draw_label(
       title,

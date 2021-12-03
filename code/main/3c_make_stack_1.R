@@ -3,7 +3,8 @@
 ################################################################################
 
 dat <- readRDS(here::here("data/analysis","dat_nona.rds")) %>%
-  sf::st_transform(7759)
+  sf::st_transform(7759) %>%
+  filter(delay >= 0)
 spde <- readRDS(here::here("data/analysis","spde.rds"))
 mesh <- readRDS(here::here("data/analysis","mesh.rds"))
 coop <- readRDS(here::here("data/analysis","coop.rds"))
@@ -11,8 +12,8 @@ coop <- readRDS(here::here("data/analysis","coop.rds"))
 # Covariates of interest
 covs <- c("age_s","sex","hiv","prv_tx",
           "marg_caste","occupation",
-          "block_endm_2017", "IRS_2017_1","vill_inc_2017_gt0", 
-          "traveltime_s", "rain",
+          "block_endm_2017", "IRS_2017","inc_2017_gt0", 
+          "traveltime_s", "traveltime_t_s", "rain",
           "detection")
 
 #------------------------------------------------------------------------------#
@@ -40,7 +41,7 @@ X <- model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))),
 # Training stack
 stk.train <- inla.stack(
   tag = "train",
-  data = list(y = dat$days_fever),
+  data = list(y = dat$delay),
   A = list(A, 1, 1),
   effects = list(s = indexs,  # the spatial index,
                  v = dat$v,

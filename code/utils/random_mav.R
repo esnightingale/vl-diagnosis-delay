@@ -7,11 +7,16 @@ random_mav <- function(fit, name){
   out.iid <- fit$summary.random$v
   
   # Calculate mean absolute value of SPDE/IID effects across all mesh nodes/villages
-  tab <- data.frame(Model = name,
-                    mav_iid = mean(abs(out.iid$mean)))
+  tab <- data.frame(Model = name)
+  
+  if(!is.null(out.iid$mean)){
+    tab$mav_iid <- mean(abs(out.iid$mean))
+    tab$msv_iid <- mean((out.iid$mean)^2)
+  }
   
   if(!is.null(out.spde$summary.values)){
     tab$mav_spde <- mean(abs(out.spde$summary.values$mean))
+    tab$msv_spde <- mean((out.spde$summary.values$mean)^2)
   }
   
   return(tab)
