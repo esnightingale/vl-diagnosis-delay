@@ -92,9 +92,9 @@ plot_obsvpred(fit.multi$fit, stk)
 #   scale_x_continuous(trans = "sqrt") +
 #   scale_y_continuous(trans = "sqrt") 
 
-ggregplot::Efxplot(fit.nb2$fit, 
-                   Intercept = FALSE) +
-  theme(legend.position = "none")
+# ggregplot::Efxplot(fit.nb2$fit, 
+#                    Intercept = FALSE) +
+#   theme(legend.position = "none")
 
 # ---------------------------------------------------------------------------- #
 # Multivariate fit with selection

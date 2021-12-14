@@ -10,10 +10,16 @@ figdir <- "figures/fit/exploratory"
 outdir <- "output/exploratory"
 
 dat <- readRDS(here::here("data/analysis","dat_nona.rds"))  %>%
-  st_transform(7759) %>%
-  filter(detection == "PCD")
-# spde <- readRDS(here::here("data/analysis","spde.rds"))
-# mesh <- readRDS(here::here("data/analysis","mesh.rds"))
+  mutate(days_fever_cat = gtools::quantcut(days_fever, 5)) 
+
+dat.prj <- dat %>%
+  st_transform(7759)
+
+# %>%
+#   filter(detection == "PCD")
+mesh <- readRDS(here::here("data/analysis","mesh.rds")) 
+spde <- readRDS(here::here("data/analysis","spde.rds"))
+stk <- readRDS(here::here("data/analysis","stack.rds"))
 
 # Setup map context
 blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
@@ -32,8 +38,8 @@ bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
 
 ggplot() +
   geom_sf(data = blockmap, fill = NA) +
-  geom_sf(data = st_jitter(dat), aes(col = days_fever), alpha = 0.8, cex = 0.5) +
-  scale_colour_viridis_c(trans = "log2") +
+  geom_sf(data = st_jitter(dat), aes(col = days_fever_cat), alpha = 0.5, cex = 1.0) +
+  scale_colour_viridis_d(direction = -1) + #trans = "log2"
   labs(col = "Delay (days)") + 
   theme(axis.text = element_blank(), panel.grid = element_blank()) +
   annotation_scale(location = "br") +
@@ -44,20 +50,37 @@ ggsave(here::here("figures/descriptive/fig1.png"), height = 7, width = 9, units 
 # ---------------------------------------------------------------------------- #
 # Investigate raw spatial dependence 
 
-vgm <- variogram(log(days_fever) ~ 1,
-                     dat,
+vgm <- variogram(delay ~ 1, #log(days_fever)
+                 # dat,
+                     filter(dat, delay >= 0),
                      cressie = TRUE)
 
-fit.vgm <- fit.variogram(vgm, vgm("Mat"), fit.kappa = TRUE)
+fit.vgm <- fit.variogram(vgm, vgm("Mat"), fit.kappa = FALSE)
 fit.vgm
+# log(days_fever):
 # model     psill    range kappa
-# 1   Nug 0.2070761  0.00000   0.0
-# 2   Mat 0.1228036 42.41172   0.4
+# 1   Nug 0.2133300  0.00000   0.0
+# 2   Mat 0.1135986 35.42219   0.5
+# 
+# days fever:
+#   model    psill    range kappa
+# 1   Nug 334.9266  0.00000   0.0
+# 2   Mat 348.6563 49.81086   0.5
+# 
+# delay >= 14
+# model    psill    range kappa
+# 1   Nug 331.2664  0.00000   0.0
+# 2   Mat 348.7189 49.71639   0.5
+
 
 plot(vgm, model = fit.vgm, 
      # ylim = c(0,0.5),
-     xlab = "Distance (km)", main = "Unadjusted log(days fever)") -> plot.vgm.raw
+     xlab = "Distance (km)", main = "Unadjusted delay beyond 14 days") -> plot.vgm.raw # days fever before diagnosis
 plot.vgm.raw
+
+
+# ggsave(here::here("figures/descriptive/vgm_daysfever.png"), height = 6, width = 8, units = "in")
+ggsave(here::here("figures/descriptive/vgm_delaygt14.png"), height = 6, width = 8, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # Fit baseline models with SPDE and IID to explain spatial structure
@@ -66,18 +89,21 @@ plot.vgm.raw
 f1 <- y ~ -1 + Intercept + f(v, model = 'iid',
                              prior = "pc.prec", 
                              param = c(1, 0.01)) 
-f2 <- y ~ -1 + Intercept + f(s, model = spde)
-f.list <- list(IID = f1, SPDE = f2)
+f2 <- y ~ -1 + Intercept + f(v, model = 'iid',
+                               prior = "pc.prec", 
+                               param = c(1, 0.01)) + f(s, model = spde) 
+
+f.list <- list(IID = f1, IID_SPDE = f2)
 
 # Fit models
-fits.base <- lapply(f.list, init_inla, data.stack = stk.full, family = "nbinomial")
+fits.base <- lapply(f.list, init_inla, data.stack = stk, family = "nbinomial")
 
 plyr::llply(fits.base, function(x) x$fit$dic$dic)
 # $IID
-# [1] 38651.08
+# [1] 37357.81
 # 
-# $SPDE
-# [1] 38762.94
+# $IID_SPDE
+# [1] 37235.07
 
 plyr::llply(fits.base, function(x) summary(x$fit))
 
@@ -143,53 +169,64 @@ get_inla_resid <- function(res, observed){
   return(df)
 }
 
-resids <- plyr::llply(fits.base, get_inla_resid, observed = dat$days_fever)
+resids <- plyr::llply(fits.base, get_inla_resid, observed = dat.prj$delay)
 hist(resids[["IID"]]$standardResidual, breaks = 30, prob = TRUE)
-hist(resids[["SPDE"]]$standardResidual, breaks = 30, prob = TRUE)
+hist(resids[["IID_SPDE"]]$standardResidual, breaks = 30, prob = TRUE)
 
 vgm.resid1 <- variogram(resids[["IID"]]$standardResidual ~ 1, 
-                        dat, 
+                        dat.prj, 
                         cressie = TRUE)
 fit.vgm.resid1 <- fit.variogram(vgm.resid1, vgm("Mat"))
 fit.vgm.resid1
 # model     psill    range kappa
-# 1   Nug 0.3669700     0.00   0.0
-# 2   Mat 0.1671981 53555.08   0.5
+# 1   Nug 0.3429789     0.00   0.0
+# 2   Mat 0.2206443 38150.47   0.5
 
-plot(vgm.resid1, #model = fit.vgm.resid1, 
-     # ylim = c(0,0.5),
-     xlab = "Distance (km)",
+plot(vgm.resid1, model = fit.vgm.resid1, 
+     ylim = c(0,0.6),
+     xlab = "Distance (m)",
      main = "Residuals: IID model") -> plot.vgm.resid1
 plot.vgm.resid1
 
-vgm.resid2 <- variogram(resids[["SPDE"]]$standardResidual ~ 1, 
-                        dat, 
+vgm.resid2 <- variogram(resids[["IID_SPDE"]]$standardResidual ~ 1, 
+                        dat.prj, 
                         cressie = TRUE)
-# fit.vgm.resid2 <- fit.variogram(vgm.resid2, vgm("Exp"))
-# fit.vgm.resid2
-#   model     psill    range kappa
-# 1   Nug 0.6812076     0.00   0.0
-# 2   Mat 0.2800832 36687.68   0.5
+fit.vgm.resid2 <- fit.variogram(vgm.resid2, vgm("Mat"))
+fit.vgm.resid2
+# model     psill    range kappa
+# 1   Nug 0.3359520     0.00   0.0
+# 2   Mat 0.2542666 40706.37   0.5
 
 plot(vgm.resid2, 
-     # model = fit.vgm.resid2, 
-     # ylim = c(0,0.5),
-     xlab = "Distance (km)",
-     main = "Residuals: SPDE model") -> plot.vgm.resid2
+     model = fit.vgm.resid2,
+     ylim = c(0,0.6),
+     xlab = "Distance (m)",
+     main = "Residuals: IID + SPDE model") -> plot.vgm.resid2
 plot.vgm.resid2
+
+vgm <- variogram(delay ~ 1, 
+                 filter(dat.prj, delay >= 0),
+                 cressie = TRUE)
+
+fit.vgm <- fit.variogram(vgm, vgm("Mat"), fit.kappa = FALSE)
+plot(vgm, model = fit.vgm, 
+     # ylim = c(0,0.5),
+     xlab = "Distance (m)", main = "Unadjusted delay beyond 14 days") -> plot.vgm.raw
+plot.vgm.raw
+
 
 png(here::here(figdir, "raw_vs_fitresid_variograms.png"), height = 500, width = 1500)
 gridExtra::grid.arrange(plot.vgm.raw, plot.vgm.resid1, plot.vgm.resid2, nrow = 1)
 dev.off()
 
-INLAutils::ggplot_inla_residuals(fits.base[["IID"]]$fit, observed = dat$days_fever)
-INLAutils::ggplot_inla_residuals(fits.base[["SPDE"]]$fit, observed = dat$days_fever)
+INLAutils::ggplot_inla_residuals(fits.base[["IID"]]$fit, observed = dat.prj$delay)
+INLAutils::ggplot_inla_residuals(fits.base[["IID_SPDE"]]$fit, observed = dat.prj$delay)
 
 #------------------------------------------------------------------------------#
 # Plot the fitted spatial field
 
 png(here::here(figdir, "map_fitted_spde.png"), height = 500, width = 1500)
-plot_spde(fits.base[["SPDE"]])
+plot_spde(fits.base[["IID_SPDE"]]$fit)
 dev.off()
 
 #------------------------------------------------------------------------------#

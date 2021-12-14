@@ -105,7 +105,7 @@ bnd.sfc <- st_multipoint(bnd$loc) %>%
 bnd.sf <- st_sf(geometry = bnd.sfc) %>%
   st_set_crs(7759)
 
-bb <- st_bbox(bnd.sf)
+bb <- st_bbox(bnd.sf) 
 x <- seq(bb[1] - 1, bb[3] + 1, length.out = 200)
 y <- seq(bb[2] - 1, bb[4] + 1, length.out = 200)
 

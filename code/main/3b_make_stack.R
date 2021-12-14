@@ -3,15 +3,15 @@
 ################################################################################
 
 dat <- readRDS(here::here("data/analysis","dat_nona.rds")) %>%
-  dplyr::filter(delay >= 0) %>%
-  sf::st_transform(7759)
+  st_transform(7759) %>%
+  dplyr::filter(delay >= 0) 
 spde <- readRDS(here::here("data/analysis","spde.rds"))
 mesh <- readRDS(here::here("data/analysis","mesh.rds"))
 coop <- readRDS(here::here("data/analysis","coop.rds"))
 
 # Setup map context
 blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
-  sf::st_transform(7759)
+  st_transform(7759) 
 
 boundary <- blockmap %>%
   sf::st_union()
