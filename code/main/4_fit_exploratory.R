@@ -93,6 +93,8 @@ f2 <- y ~ -1 + Intercept + f(v, model = 'iid',
                                prior = "pc.prec", 
                                param = c(1, 0.01)) + f(s, model = spde) 
 
+
+
 f.list <- list(IID = f1, IID_SPDE = f2)
 
 # Fit models
