@@ -7,8 +7,8 @@
 
 source(here::here("code","setup_env.R"))
 
-figdir <- "figures/fit/univariate"
-outdir <- "output/univariate"
+figdir <- "figures/fit/univariate/poisson"
+outdir <- "output/univariate/poisson"
 
 covs <- list("age_s","sexMale","hivYes","prv_txYes","marg_casteYes",c("occupationUnskilled",
               "occupationSkilled", "`occupationSalaried.selfemployed`"), "detectionACD",
@@ -19,28 +19,40 @@ covs2 <- list("age_s","sexMale","hivYes","prv_txYes","marg_casteYes","occupation
              "block_endm_2017Endemic", "IRS_2017Yes","inc_2017_gt0Yes",
              "traveltime_s","rain") #"traveltime_t_s", 
 covs3 <- list("age_s","hivYes", "detectionACD",
-              "block_endm_2017Endemic","inc_2017_gt0Yes") 
+              "block_endm_2017Endemic","inc_2017_gt0Yes",
+              "traveltime_s","rain") 
 
+mesh <- readRDS(here::here("data/analysis","mesh.rds")) 
 spde <- readRDS(here::here("data/analysis","spde.rds"))
 stk <- readRDS(here::here("data/analysis","stack.rds"))
+idx <- stk$data$index$train
+
+# Setup map context for plotting SPDE
+blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
+  sf::st_transform(7759)
+boundary <- blockmap %>%
+  sf::st_union()
+boundary.spdf <- as_Spatial(boundary)
 
 # ---------------------------------------------------------------------------- #
 # Univariate fits
+
+family <- "poisson"
 
 fit_covs_uni <- function(cov) {
   
   # Define formula
   f <- as.formula(paste0("y ~ -1 + Intercept +", 
                          paste0(cov, collapse = " + "), 
-                         "+ f(v, model = 'iid',
+                         "+ f(id, model = 'iid',
                              prior = 'pc.prec', 
-                             param = c(1, 0.01)) +
+                             param = c(10, 0.01)) +
                             f(s, model = spde)"))
   
   print(f)
   
   # Fit model
-  fit <- init_inla(f, data.stack = stk, family = "nbinomial", cpo = F)$fit
+  fit <- init_inla(f, data.stack = stk, family = family, cpo = F)$fit
   
   res <- list(f = f, fit = fit)
   return(res)
@@ -59,16 +71,20 @@ ggregplot::Efxplot(plyr::llply(fits.uni, function(x) x$fit),
 
 f <- as.formula(paste0("y ~ ", 
                        paste0(covs2, collapse = " + "), 
-                       "+ f(v, model = 'iid',
+                       "+ f(id, model = 'iid',
                              prior = 'pc.prec', 
-                             param = c(1, 0.01)) +
+                             param = c(10, 0.01)) +
                             f(s, model = spde)"))
 
-fit.multi <- init_inla(f, data.stack = stk, family = "nbinomial", cpo = T)
+fit.multi <- init_inla(f, data.stack = stk, family = "poisson", cpo = T)
 
 saveRDS(fit.multi, here::here(outdir, "fit_covs_multivar.rds"))
 
-plot_obsvpred(fit.multi$fit, stk)
+# plot_obsvpred(fit.multi$fit, stk, idx = idx, title = "family", trans = TRUE, smooth = TRUE)
+
+p_vgm <- plot_vgm(fit.multi$fit$summary.random$id$mean, dat, title = "Fitted IID effects: Full model")
+
+p_spde <- plot_spde(fit.multi$fit)
 
 # p_le30 <- pnbinom(q = 30, prob = fit.nb2$fit$summary.fitted.values$mean[idx], size = 1)
 # 
@@ -101,19 +117,32 @@ plot_obsvpred(fit.multi$fit, stk)
 
 f <- as.formula(paste0("y ~ ", 
                        paste0(covs3, collapse = " + "), 
-                       "+ f(v, model = 'iid',
+                       "+ f(id, model = 'iid',
                              prior = 'pc.prec', 
-                             param = c(1, 0.01)) +
+                             param = c(10, 0.01)) +
                             f(s, model = spde)"))
 
-fit.multi2 <- init_inla(f, data.stack = stk, family = "nbinomial", cpo = F)
+fit.multi2 <- init_inla(f, data.stack = stk, family = "poisson", cpo = F)
 
 saveRDS(fit.multi2, here::here(outdir, "fit_covs_multivar_select.rds"))
+
+p_vgm2 <- plot_vgm(fit.multi2$fit$summary.random$id$mean, dat, title = "Fitted IID effects: Full model with selection")
+
+p_spde2 <- plot_spde(fit.multi2$fit)
+
+png(here::here(figdir, "vgm_iid_multi_select.png"), height = 500, width = 1000)
+gridExtra::grid.arrange(p_vgm, p_vgm2, nrow = 1)
+dev.off()
+
+png(here::here(figdir, "spde_multi_select.png"), height = 1000, width = 1000)
+gridExtra::grid.arrange(p_spde, p_spde2, nrow = 2)
+dev.off()
 
 # ---------------------------------------------------------------------------- #
 # Compare fitted regression estimates
 
 fits.all <- rlist::list.append(fits.uni, fit.multi, fit.multi2)
+saveRDS(fits.all, here::here(outdir, "fits_covs_all.rds"))
 
 c("Intercept",
   "Age (std)",
@@ -134,17 +163,19 @@ c("Intercept",
   "Intercept"
   ) -> axis.labs
 
-lapply(fits.all, function(x) summary(x$fit))
+# lapply(fits.all, function(x) summary(x$fit))
 
-ggregplot::Efxplot(plyr::llply(fits.all, function(x) x$fit), 
+Efxplot(plyr::llply(fits.all, function(x) x$fit), 
                    VarNames = rev(axis.labs),
-                   Intercept = FALSE
+                   Intercept = FALSE, Size = 1.5
                    ) +
+  scale_y_continuous(limits = c(-0.4, 0.6)) +
   scale_colour_manual(values = c(rep("indianred",length(fits.uni)),
                                  "steelblue",
                                  "forestgreen")) +
   theme(legend.position = "none") + 
-  labs(caption = "Univariate estimate in red, multivariate in blue and multivariate with selected covariates only in green.")
+  labs(title = "Estimated covariate effects: spatial models",
+       caption = "Univariate estimate in red, multivariate in blue and multivariate with selected covariates only in green.")
 
 ggsave(here::here(figdir, "covs_uni_multi_efx.png"), height = 6, width = 8, units = "in", dpi = 300)
 

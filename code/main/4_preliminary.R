@@ -6,9 +6,9 @@
 source(here::here("code","setup_env.R"))
 
 figdir <- "figures/descriptive"
-datadir <- "~/VL/Data/KAMIS/Clean/linelist"
+datadir <- "~/VL/Data/KAMIS/Clean/ll"
 
-dat <- readRDS(file.path(datadir,"analysisdata_individual.rds")) %>%
+dat <- read_data() %>%
   dplyr::mutate(inc_2017_gt0 = factor(as.numeric(replace_na(inc_2017,0) > 0), 
                                              levels = c(0,1), labels = c("No","Yes")),
                 inc_2017_gt1e3 = factor(as.numeric(replace_na(inc_2017,0) > 1), 
@@ -20,9 +20,8 @@ dat <- readRDS(file.path(datadir,"analysisdata_individual.rds")) %>%
                 traveltime_adj = traveltime + 0.5,
                 delay_gt30 = (delay > 30),
                 delay_gt90 = (delay > 90))
-dat.df <- sf::st_drop_geometry(dat) 
 
-village <- readRDS(file.path(datadir,"analysisdata_village.rds"))
+dat.df <- sf::st_drop_geometry(dat) 
 
 # Setup map context
 blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
@@ -36,37 +35,6 @@ bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
 # Travel time rasters
 access_d <- raster::raster(here::here("data","covariates","diag_facility_travel_time.tif"))
 access_t <- raster::raster(here::here("data","covariates","trt_facility_travel_time.tif"))
-
-# ---------------------------------------------------------------------------- #
-# Patients with negative delay
-
-library(Rmisc)
-
-dat.df %>%
-  mutate(delay = factor(delay < 0, 
-                        levels = c(FALSE,TRUE), 
-                        labels = c("> 14 days","<= 14 days"))) %>%
-  group_by(delay) %>%
-  filter(!is.na(prv_tx) & !is.na(marg_caste) & !is.na(hiv) & !is.na(occupation)) %>%
-  dplyr::summarise(N = n(),
-                  age = paste0(round(CI(age),1), collapse = "-"),
-                  p_child = paste0(round(CI((age_child == "Under 16")),2), collapse = "-"),
-                  p_female = paste0(round(CI((sex == "Female")),2), collapse = "-"),
-                  p_marg = paste0(round(CI((marg_caste == "Yes")),2), collapse = "-"),
-                  p_hiv = paste0(round(CI((hiv == "Yes")),2), collapse = "-"),
-                  p_prvtx = paste0(round(CI((prv_tx == "Yes")),2), collapse = "-"),
-                  p_acd = paste0(round(CI((detection == "ACD")),2), collapse = "-"),
-                  p_working = paste0(round(CI((occupation != "Not working")),2), collapse = "-"),
-                  p_conslt_gt1 = paste0(round(CI((!num_conslt %in% c("0","1"))),2), collapse = "-"),
-                  p_villinc_gt0 = paste0(round(CI((inc_2017 > 0)),2), collapse = "-"),
-                  p_irs = paste0(round(CI((IRS_2017 != "0")),2), collapse = "-"),
-                  p_end = paste0(round(CI((block_endm_2017 == "Endemic")),2), collapse = "-"),
-                  mean_travel = paste0(round(CI(traveltime),1), collapse = "-"),
-                  mean_travel_t = paste0(round(CI(traveltime_t),1), collapse = "-")) %>% 
-  tibble::column_to_rownames("delay") -> tab_negative_delay
-
-# View(t(tab_negative_delay))
-write.csv(t(tab_negative_delay), here::here("output","exploratory","pat_chars_negative_delay.csv"))
 
 # ---------------------------------------------------------------------------- #
 # Delay versus patient characteristics

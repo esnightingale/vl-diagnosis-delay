@@ -5,61 +5,58 @@
 
 source(here::here("code","setup_env.R"))
 
-# Local data folder
-datadir <- "C:/Users/phpuenig/Documents/VL/Data/KAMIS/Clean/linelist"
-
-# Proportion to withhold from fitting for final validation
-val.size <- 0.25
-
-# Read data and define final variables for modelling
-dat <- readRDS(file.path(datadir,"analysisdata_individual.rds")) %>%
-  dplyr::mutate(le30 = as.numeric(days_fever <= 30),
-                id = row_number(),
-                v = as.numeric(as.factor(vil_code)),
-                rain = as.numeric(diag_rainseason),
-                age_s = as.numeric(scale(age, center = T)),
-                consult_gt0 = (num_conslt != "0"),
-                traveltime_s = as.numeric(scale(traveltime, center = T)),
-                traveltime_t_s = as.numeric(scale(traveltime_t, center = T)),
-                IRS_2017 = factor((IRS_2017 != 0), labels = c("No","Yes")),
-                inc_2017_t = inc_2017*1e3 + 1e-4,
-                inc_2017_s = as.numeric(scale(inc_2017, center = T)),
-                inc_2017_gt0 = factor((replace_na(inc_2017,0) > 0), labels = c("No","Yes")),
-                vl_affect_1517 = factor(vl_affect_1517, levels = c(0,1), labels = c("No","Yes")))
+# Read cleaned analysis data 
+dat <- read_data()
 
 # ---------------------------------------------------------------------------- #
 # Exclude observations missing any covariate of interest
 
 n_all <- nrow(dat)
-dat <- dat %>%
-  dplyr::select(delay, days_fever, age_s, sex, hiv, marg_caste, occupation, detection, prv_tx, 
-                consult_gt0, latitude, longitude, traveltime, traveltime_s, traveltime_t_s, inc_2017_t,
-                inc_2017_gt0, IRS_2017, block_endm_2017, id, v, district, block, rain, geometry) %>%
+dat_nona <- dat %>%
+  dplyr::select(delay, gt30, dur_fev_r, age_s, sex, comorb1, caste4_r, occ4_cat, poss_acd, rain, prv_tx, 
+                latitude, longitude, traveltime_s, traveltime_t_s, 
+                inc_2017_gt0, IRS_2017, block_endm_2017, id, v, district, block, geometry) %>%
   drop_na() %>%
   st_as_sf()
 
-print(paste(n_all - nrow(dat),"observations deleted due to missingness"))
+n_nonmiss <- nrow(dat_nona)
+
+# Compare delay between those with complete/incomplete covariate information
+summary(dat$delay)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# -10.00   11.00   16.00   31.04   44.00  496.00 
+summary(dat_nona$delay)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# -10.00   11.00   16.00   30.86   44.00  496.00
+
+print(paste(n_all - n_nonmiss,"observations deleted due to missingness"))
 # "84 observations deleted due to missingness"
+
+dat <- dat_nona %>%
+  dplyr::filter(delay >= 0)
+
+print(paste(n_nonmiss - nrow(dat),"observations deleted due to negative delay"))
+
 saveRDS(dat, here::here("data/analysis","dat_nona.rds"))
 
 # ---------------------------------------------------------------------------- #
 # Split fitting and validation data
 
-v.idx <- sample(1:nrow(dat), floor(nrow(dat)*val.size))
-
-dat.fit <- dat[-v.idx,]
-dat.val <- dat[v.idx,]
-
-dat.fit.df <- st_drop_geometry(dat.fit)
-dat.val.df <- st_drop_geometry(dat.val)
-
-# Full dataset with outcome set to NA for validation points
-dat.fit.val <- dat
-dat.fit.val$days_fever[v.idx] <- NA
-
-saveRDS(dat.fit, here::here("data/analysis","dat_fit.rds"))
-saveRDS(dat.val, here::here("data/analysis","dat_val.rds"))
-saveRDS(dat.fit.val, here::here("data/analysis","dat_fit_val.rds"))
+# v.idx <- sample(1:nrow(dat), floor(nrow(dat)*val.size))
+# 
+# dat.fit <- dat[-v.idx,]
+# dat.val <- dat[v.idx,]
+# 
+# dat.fit.df <- st_drop_geometry(dat.fit)
+# dat.val.df <- st_drop_geometry(dat.val)
+# 
+# # Full dataset with outcome set to NA for validation points
+# dat.fit.val <- dat
+# dat.fit.val$days_fever[v.idx] <- NA
+# 
+# saveRDS(dat.fit, here::here("data/analysis","dat_fit.rds"))
+# saveRDS(dat.val, here::here("data/analysis","dat_val.rds"))
+# saveRDS(dat.fit.val, here::here("data/analysis","dat_fit_val.rds"))
 
 ################################################################################
 ################################################################################

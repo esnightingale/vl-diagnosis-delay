@@ -17,10 +17,10 @@ plot_exc <- function(x, name){
   
   ggplot(x, aes(exc.obs, exc.prob, col = exc.obs)) +
     geom_boxplot() +
-    geom_hline(yintercept = 0.5, lty = "dashed", col = "grey") + 
+    # geom_hline(yintercept = 0.5, lty = "dashed", col = "grey") + 
     guides(col = "none") + 
     # scale_y_continuous(trans = "logit") +
-    ylim(c(0,1)) +
+    # ylim(c(0,1)) +
     labs(x = "Observed delay > 30 days", y = "Fitted exceedance probability",
          title = name) 
 

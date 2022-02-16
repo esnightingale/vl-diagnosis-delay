@@ -4,7 +4,8 @@
 
 dat <- readRDS(here::here("data/analysis","dat_nona.rds")) %>%
   st_transform(7759) %>%
-  filter(delay >= 0)
+  filter(delay >= 0) %>%
+  mutate(delay_gt30 = as.numeric(delay > 30))
 
 spde <- readRDS(here::here("data/analysis","spde.rds"))
 mesh <- readRDS(here::here("data/analysis","mesh.rds"))
@@ -42,10 +43,11 @@ X <- model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))),
 # Training stack
 stk.train <- inla.stack(
   tag = "train",
-  data = list(y = dat$delay),
-  A = list(A, 1, 1),
+  data = list(y = dat$delay), delay_gt30
+  A = list(A, 1, 1, 1),
   effects = list(s = indexs,  # the spatial index,
-                 v = dat$v,
+                 v = dat$v, # village index
+                 id = dat$id, # individual index
                  data.frame(  # covariates
                    Intercept = 1, 
                    X)

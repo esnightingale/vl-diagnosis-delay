@@ -9,11 +9,9 @@ source(here::here("code","setup_env.R"))
 figdir <- "figures/fit/exploratory"
 outdir <- "output/exploratory"
 
-dat <- readRDS(here::here("data/analysis","dat_nona.rds"))  %>%
-  st_transform(7759) %>%
-  filter(detection == "PCD")
-
+dat <- readRDS(here::here("data/analysis","dat_nona.rds")) 
 mesh <- readRDS(here::here("data/analysis","mesh.rds"))
+spde <- readRDS(here::here("data/analysis","spde.rds"))
 
 # Setup map context
 blockmap <- readRDS(here::here("data","geography","bihar_block.rds")) %>%
@@ -24,45 +22,9 @@ boundary <- blockmap %>%
 
 boundary.spdf <- as_Spatial(boundary)
 
-extent <- setNames(st_bbox(blockmap), c("left","bottom","right","top"))
-bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
-
-
 ################################################################################
 # Define data stack
 ################################################################################
-
-# Shorter range - 5km
-spde1 <- inla.spde2.pcmatern(mesh = mesh, 
-                            prior.range = c(5000, 0.01), # P(range < U) = a
-                            prior.sigma = c(1.5, 0.1), # P(sigma > U) = a
-                            constr = TRUE)
-
-# Longer range - 50km
-spde2 <- inla.spde2.pcmatern(mesh = mesh, 
-                             prior.range = c(5e5, 0.01), # P(range < U) = a
-                             prior.sigma = c(1.5, 0.1), # P(sigma > U) = a
-                             constr = TRUE)
-
-# Smaller sigma
-spde3 <- inla.spde2.pcmatern(mesh = mesh, 
-                             prior.range = c(5000, 0.01), # P(range < U) = a
-                             prior.sigma = c(1.1, 0.1), # P(sigma > U) = a
-                             constr = TRUE)
-
-# Greater sigma
-spde4 <- inla.spde2.pcmatern(mesh = mesh, 
-                             prior.range = c(5000, 0.01), # P(range < U) = a
-                             prior.sigma = c(2, 0.1), # P(sigma > U) = a
-                             constr = TRUE)
-
-#------------------------------------------------------------------------------#
-# Generate the index set for this SPDE
-
-s1 <- inla.spde.make.index("s", spde1$n.spde)
-s2 <- inla.spde.make.index("s", spde2$n.spde)
-s3 <- inla.spde.make.index("s", spde3$n.spde)
-s4 <- inla.spde.make.index("s", spde4$n.spde)
 
 #------------------------------------------------------------------------------#
 # Generate a projection matrix A - projects the spatially continuous GRF from

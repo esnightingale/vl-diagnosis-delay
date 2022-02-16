@@ -1,15 +1,24 @@
-plot_vgm <- function(values, loc, title = NULL){
+plot_vgm <- function(values, data, width, title = NULL, fit.kappa = FALSE, ylim = NULL){
   
   vgm <- variogram(values ~ 1,
-                   loc, 
+                   data, 
+                   # width = width,
                    cressie = TRUE)
 
-  fit.vgm <- fit.variogram(vgm, vgm("Mat"), fit.kappa = TRUE)
+  fit.vgm <- fit.variogram(vgm, vgm("Mat"), fit.kappa = fit.kappa)
   print(fit.vgm)
 
-  plot(vgm,
-       fit.vgm,
-       xlab = "Distance", main = title) -> plot
+  if (!is.null(ylim)){
+    plot(vgm,
+         fit.vgm,
+         ylim = ylim,
+         xlab = "Distance", main = title) -> plot
+  }else{
+    plot(vgm,
+         fit.vgm,
+         xlab = "Distance", main = title) -> plot
+  }
+
   
   return(plot)
 

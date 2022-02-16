@@ -2,7 +2,7 @@
 
 plot_diff_spde <- function(fit, name, absolute = FALSE, 
                            limit.mean = c(-1,1), 
-                           limit.diff = c(-0.1,0.1),
+                           limit.diff = c(-0.5,0.5),
                            limit.sd = c(-0.02,0.02)){
   
   # Evaluate fitted SPDE from given model over this projection
@@ -25,11 +25,15 @@ plot_diff_spde <- function(fit, name, absolute = FALSE,
       #               diff_sd = (sd_i - abs(sd_base)))
   }
 
+  
+  df <- st_as_sf(df, coords = c("x","y"), remove = FALSE) %>%
+    st_intersection(boundary)
+  
   # Map out the values themselves
   pal <- viridis::viridis(2)
   gmean <- ggplot() + 
     geom_raster(data = df, aes(x = x, y = y, fill = mean_i)) +
-    scale_fill_viridis_c(na.value = "transparent", limits = limit.mean) +
+    scale_fill_viridis_c(na.value = "transparent", limits = limit.mean, direction = -1, end = 0.9) +
     gg(boundary.spdf, fill = "transparent") +
     labs(subtitle = "Fitted mean",
          fill = "",
@@ -40,7 +44,7 @@ plot_diff_spde <- function(fit, name, absolute = FALSE,
   # Map out the differences
   gdiff <- ggplot() + 
     geom_raster(data = df, aes(x = x, y = y, fill = diff_mean)) +
-    scale_fill_viridis_c(na.value = "transparent", limits = limit.diff) +
+    scale_fill_viridis_c(option = "plasma", na.value = "transparent", limits = limit.diff) +
     gg(boundary.spdf, fill = "transparent") +
     labs(subtitle = "Difference in mean",
          fill = "",
@@ -50,7 +54,7 @@ plot_diff_spde <- function(fit, name, absolute = FALSE,
   
   gsd <- ggplot() + 
     geom_raster(data = df, aes(x = x, y = y, fill = diff_sd))+
-    scale_fill_viridis_c(na.value = "transparent", limits = limit.sd)  +
+    scale_fill_viridis_c(option = "plasma", na.value = "transparent", limits = limit.sd)  +
     gg(boundary.spdf, fill = "transparent") +
     labs(subtitle = "Difference in stdev",
          fill = "",

@@ -17,8 +17,8 @@
 
 source(here::here("code","setup_env.R"))
 
-figdir <- "figures/fit"
-outdir <- "output"
+figdir <- "figures/fit/poisson"
+outdir <- "output/poisson"
 
 covs_pat <- c("age_s","sex","hiv")
 covs_ses <- c("marg_caste","occupation")

@@ -19,12 +19,15 @@ plot_diff_spde_cat <- function(fit, name,
                   diff_abs_mean = cut(abs(mean_i) - abs(mean_base), breaks = breaks)
                     # across(starts_with("diff"), function(x) cut(x, breaks = breaks)
                     )
-   
+  
+  df <- st_as_sf(df, coords = c("x","y"), remove = FALSE) %>%
+    st_intersection(boundary)
+  
   # Map out the values themselves
   pal <- viridis::viridis(2)
   gmean <- ggplot() + 
     geom_raster(data = df, aes(x = x, y = y, fill = mean_i)) +
-    scale_fill_viridis_c(na.value = "transparent", limits = limit.mean) +
+    scale_fill_viridis_c(na.value = "transparent", limits = limit.mean, direction = -1, end = 0.9) +
     gg(boundary.spdf, fill = "transparent") +
     labs(subtitle = "Mean",
          fill = "",
@@ -35,7 +38,7 @@ plot_diff_spde_cat <- function(fit, name,
   # Map out the differences
   gdiff <- ggplot() + 
     geom_raster(data = df, aes(x = x, y = y, fill = diff_mean_cat)) +
-    scale_fill_viridis_d(na.value = "transparent", option = "magma", na.translate = FALSE)  +
+    scale_fill_viridis_d(na.value = "transparent", option = "plasma", na.translate = FALSE)  +
     gg(boundary.spdf, fill = "transparent") +
     labs(subtitle = "Difference from null",
          fill = "",

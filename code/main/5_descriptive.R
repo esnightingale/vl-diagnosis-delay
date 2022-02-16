@@ -5,23 +5,19 @@
 ################################################################################
 
 figdir <- "figures/descriptive"
-datadir <- "~/VL/Data/Analysis"
 
 # Load analysis data
-dat <- readRDS(here::here("data/analysis","dat_nona.rds")) %>%
-  dplyr::filter(delay >= 0) %>%
-  dplyr::mutate(delay_cat5 = cut(delay, c(0,15,30,90,180,730), include.lowest = TRUE, ordered_result = TRUE),
-                delay_cat3 = cut(delay, c(0,30,90,730), include.lowest = TRUE, ordered_result = TRUE),
-                delay_gt30 = (delay > 30),
-                delay_gt90 = (delay > 90)) %>%
+dat <- read_data() %>%
+  dplyr::mutate(delay_cat5 = gtools::quantcut(delay, 5),
+                delay_cat3 = gtools::quantcut(delay, 3),
+                gt90 = (delay > 90),
+                gt60 = (delay > 60)) %>%
   arrange(delay)
 
 # Setup map context
-blockmap <- readRDS(here::here("data","geography","bihar_block.rds"))
-
-# centre <- c(lon = mean(match$longitude), lat = mean(match$latitude))
-extent <- setNames(st_bbox(blockmap), c("left","bottom","right","top"))
-bh_lines <- get_stamenmap(bbox = extent, maptype = "terrain-lines", zoom = 8)
+blockmap <- readRDS(here::here("data","geography","blockmap.rds"))
+boundary <- readRDS(here::here("data","geography","boundary.rds"))
+boundary.spdf <- as_Spatial(boundary)
 
 ################################################################################
 # Overall summary
@@ -30,36 +26,41 @@ summary(dat$delay)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 0.00   11.00   16.00   31.26   46.00  496.00 
 summary(dat$delay_cat5)
-# [0,15]   (15,30]   (30,90]  (90,180] (180,730] 
-# 1475      1406      1208       221        43 
+# [0,8]   (8,16]  (16,21]  (21,46] (46,496] 
+# 909     1498      228      960      676 
 summary(dat$delay_cat3)
-# [0,30]  (30,90] (90,730] 
-# 2881     1208      264 
-summary(dat$delay_gt90)
-#    Mode   FALSE    TRUE 
-# logical    4089     264
+# [0,15]  (15,31] (31,496] 
+# 1449     1590     1232 
+summary(dat$gt90)
+# Mode   FALSE    TRUE 
+# logical    4014     257 
+
+dat %>%
+  ggplot(aes(x = dur_fev_r)) +
+  geom_histogram(bins = 50) +
+  xlim(c(0,365)) +
+  geom_vline(xintercept = 14, lty = "dashed") +
+  annotate("text", x = 300, y = 300, size = 2, 
+           label = paste0("N = 24", #Axis cut at 365 days\n
+                          # sum(dat$days_fever < 14),
+                          " cases with < 14 days fever before diagnosis\nN = ",
+                          sum(dat$dur_fev_r > 365),
+                          " cases with > 365 days"
+                          )) +
+  # facet_wrap(~diag_year) +
+  labs(x = "Onset to diagnosis (days)", y = "Frequency") -> days_fever_hist
+days_fever_hist
+
+ggsave(here::here(figdir,"days_fever_hist.png"),
+       days_fever_hist,
+       height = 4, width = 5, units = "in")
 
 ################################################################################
 # Observed delays over time
 
-# ---------------------------------------------------------------------------- #
-# By year
-
-dat %>%
-  ggplot(aes(x = delay, after_stat(density))) +
-  geom_histogram(bins = 50) +
-  xlim(c(0,365)) +
-  labs(x = "Onset to diagnosis (days)", y = "Density") -> delay_hist
-delay_hist
-
-ggsave(here::here(figdir,"delay_hist.png"),
-       delay_hist,
-       height = 4, width = 8, units = "in")
-
-# ---------------------------------------------------------------------------- #
-# By month
-
-dat %>%
+dat_indiv <- readRDS(file.path(datadir,"analysisdata_individual.rds"))
+  
+dat_indiv %>%
   st_drop_geometry() %>%
   group_by(diag_month) %>%
   dplyr::summarise(N = n(),
@@ -103,120 +104,92 @@ ggsave(here::here(figdir,"prop_excessive_bymth.png"),
 # Observed delays by location
 
 # ---------------------------------------------------------------------------- #
-# Individuals
+# Visualise the spatial range of the data and pattern of delays
 
-## Continuous
-ggmap(bh_lines, 
-      base_layer = ggplot(arrange(st_jitter(dat), 
-                                  delay), 
-                          aes(col = delay))) +
-  geom_sf(alpha = 0.5, cex = 0.8) +
-  scale_colour_viridis_c(trans = "log10", direction = -1, option = "plasma") +
-  labs(x = "", y = "", col = "Delay", subtitle = "Diagnoses between Jan 2018 - July 2019") -> map_village
-map_village
+ggplot() +
+  geom_sf(data = blockmap, fill = NA) +
+  geom_sf(data = st_jitter(dat), aes(col = delay_cat5), alpha = 0.9, cex = 1.0) +
+  scale_colour_viridis_d(direction = -1, end = 0.9) + #trans = "log2"
+  labs(col = "Delay (days)") + 
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) 
 
-ggsave(here::here(figdir,"delay_byvil.png"),
-       map_village,
-       height = 7, width = 10, units = "in")
+ggsave(here::here("figures/descriptive/fig1_block.png"), height = 7, width = 9, units = "in")
 
+ggplot() +
+  geom_sf(data = boundary, fill = NA) +
+  geom_sf(data = st_jitter(dat), aes(col = delay_cat5), alpha = 0.9, cex = 1.0) +
+  scale_colour_viridis_d(direction = -1, end = 0.9) + #trans = "log2"
+  labs(col = "Delay (days)") + 
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) 
+# +
+#   annotation_scale(location = "br") +
+#   annotation_north_arrow(location = "tr", pad_x = unit(2, "cm"), pad_y = unit(1, "cm"))
 
-## 5 categories
-ggmap(bh_lines, 
-      base_layer = ggplot(dat, 
-                          aes(x = longitude, y = latitude, col = delay_cat5))) +
-  geom_jitter(alpha = 0.8) +
-  scale_colour_viridis_d(option = "viridis", na.value = "grey", direction = -1, end = 0.9) +
-  labs(x = "", y = "", col = "Delay") -> map_cat5
-map_cat5
-
-ggsave(here::here(figdir, "village_delay_cat5.png"), 
-       map_cat5, 
-       height = 7, width = 10, units = "in")
-
-## 3 categories
-ggmap(bh_lines, 
-      base_layer = ggplot(dat, 
-                          aes(x = longitude, y = latitude, col = delay_cat3))) +
-  geom_jitter(alpha = 0.8) +
-  scale_colour_viridis_d(option = "viridis", na.value = "grey", direction = -1, end = 0.9) +
-  labs(x = "", y = "", col = "Delay") -> map_cat3
-map_cat3
-
-ggsave(here::here(figdir, "village_delay_cat3.png"), 
-       map_cat3, 
-       height = 7, width = 10, units = "in")
-
-
-## Binary > 90 days
-ggmap(bh_lines, 
-      base_layer = ggplot(arrange(dat, delay_gt90), 
-                          aes(x = longitude, y = latitude, col = delay_gt90))) +
-  geom_jitter(alpha = 0.8) +
-  scale_colour_manual(values = c("grey","indianred")) +
-  labs(x = "", y = "", col = "Delay > 90 days", subtitle = "Diagnoses between Jan 2018 - July 2019") -> map_excess
-map_excess
-
-ggsave(here::here(figdir, "village_delay_excess.png"), 
-       map_excess, 
-       height = 7, width = 10, units = "in")
+ggsave(here::here("figures/descriptive/fig1_state.png"), height = 7, width = 9, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # By village
 
 dat %>%
-  group_by(vil_code, latitude, longitude) %>%
+  group_by(v, latitude, longitude) %>%
   dplyr::summarise(N = n(),
-            pop = unique(population),
-            inc = replace_na(N*1e3/unique(pop),0),
             med_delay = median(delay, na.rm = T),
-            propgt30 = mean((delay > 30), na.rm = T)*100,
-            propgt90 = mean((delay > 90), na.rm = T)*100) %>%
+            propgt30 = mean(gt30, na.rm = T)*100,
+            propgt60 = mean(gt60, na.rm = T)*100,
+            propgt90 = mean(gt90, na.rm = T)*100) %>%
   arrange(propgt90) -> by_village
 
 ## Median
-ggmap(bh_lines, 
-      base_layer = ggplot(by_village, 
-                          aes(x = longitude, y = latitude, col = med_delay))) +
-  geom_point(pch = 19, alpha = 0.5) +
-  scale_colour_viridis_c(option = "viridis", na.value = "grey", direction = -1, trans = "log2", end = 0.9) +
+ggplot() +
+  geom_sf(data = boundary, fill = NA) +
+  geom_sf(data = by_village, aes(col = med_delay), alpha = 0.9, cex = 1.0) +
+  geom_point(pch = 19, alpha = 0.9) +
+  scale_colour_viridis_c(option = "viridis", na.value = "grey", direction = -1, trans = "identity", end = 0.9) +
   # scale_alpha_continuous(trans = "log10") +
-  labs(x = "", y = "", col = "Median delay") -> map_med_delay
+  labs(x = "", y = "", col = "Median delay") + 
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) -> map_med_delay
 map_med_delay
 
-ggsave(here::here(figdir, "village_med_delay.png"), 
-       map_med_delay, 
+ggsave(here::here(figdir, "village_med_delay.png"),
+       map_med_delay,
        height = 7, width = 10, units = "in")
 
 
 ## % greater than 30 days
-ggmap(bh_lines, 
-      base_layer = ggplot(by_village, 
-                          aes(x = longitude, y = latitude, col = propgt30))) +
+ggplot() +
+  geom_sf(data = boundary, fill = NA) +
+  geom_sf(data = by_village, aes(col = propgt30), alpha = 0.9, cex = 1.0) +
   geom_point(alpha = 0.7) +
-  scale_colour_viridis_c(option = "magma", na.value = "grey", direction = -1, end = 0.9) +
+  scale_colour_viridis_c(option = "viridis", na.value = "grey", direction = -1, end = 0.9) +
   # scale_alpha_continuous(trans = "log10") +
-  labs(x = "", y = "", col = "% > 30 days") -> map_propgt30
+  labs(x = "", y = "", col = "% > 30 days") + 
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) -> map_propgt30
 map_propgt30
 
-ggsave(here::here(figdir, "village_propgt30.png"), 
-       map_propgt30, 
+ggsave(here::here(figdir, "village_propgt30.png"),
+       map_propgt30,
        height = 7, width = 10, units = "in")
 
 
 ## % greater than 90 days
-ggmap(bh_lines, 
-      base_layer = ggplot(by_village, 
-                          aes(x = longitude, y = latitude, col = propgt90))) +
+ggplot() +
+  geom_sf(data = boundary, fill = NA) +
+  geom_sf(data = by_village, aes(col = propgt90), alpha = 0.9, cex = 1.0) +
   geom_point(alpha = 0.7) +
-  scale_colour_viridis_c(option = "magma", na.value = "grey", direction = -1, end = 0.9) +
+  scale_colour_viridis_c(option = "viridis", na.value = "grey", direction = -1, end = 0.9) +
   # scale_alpha_continuous(trans = "log10") +
-  labs(x = "", y = "", col = "% > 90 days") -> map_propgt90
+  labs(x = "", y = "", col = "% > 90 days") + 
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) -> map_propgt90
 map_propgt90
 
-ggsave(here::here(figdir, "village_propgt90.png"), 
-       map_propgt90, 
+ggsave(here::here(figdir, "village_propgt90.png"),
+       map_propgt90,
        height = 7, width = 10, units = "in")
-
 
 # ---------------------------------------------------------------------------- #
 # By block
@@ -226,8 +199,10 @@ dat %>%
   group_by(district, block) %>%
   dplyr::summarise(N = n(),
             med_delay = median(delay, na.rm = T),
-            pgt90 = mean(delay_gt90, na.rm = T)*100,
-            pgt30 = mean(delay_gt30, na.rm = T)*100) %>%
+            pgt90 = mean(gt90, na.rm = T)*100,
+            pgt60 = mean(gt60, na.rm = T)*100,
+            pgt30 = mean(gt30, na.rm = T)*100,
+            pACD = mean(detection == "ACD")*100) %>%
   mutate(delay_cat3 = cut(med_delay, c(0,15,90,730), include.lowest = TRUE, ordered_result = TRUE)) %>%
   ungroup() -> by_block
 
@@ -244,7 +219,8 @@ ggplot() +
   geom_sf(data = by_block, aes(geometry = geometry, fill = med_delay)) +
   scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, trans = "sqrt", end = 0.9) +
   labs(fill = "Median delay") + 
-  theme(axis.text = element_blank()) -> blk_med_delay
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) -> blk_med_delay
 blk_med_delay
 
 ggsave(here::here(figdir, "block_med_delay.png"), blk_med_delay, height = 7, width = 10, units = "in")
@@ -252,9 +228,10 @@ ggsave(here::here(figdir, "block_med_delay.png"), blk_med_delay, height = 7, wid
 ggplot() +
   geom_sf(data = blockmap) +
   geom_sf(data = by_block, aes(geometry = geometry, fill = pgt30)) +
-  scale_fill_viridis_c(option = "magma", na.value = "white", direction = -1, end = 0.8) +
+  scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, end = 0.9) +
   labs(fill = "% > 30 days") + 
-  theme(axis.text = element_blank()) -> blk_pgt30
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) -> blk_pgt30
 blk_pgt30
 
 ggsave(here::here(figdir, "block_propgt30.png"), blk_pgt30, height = 7, width = 10, units = "in")
@@ -262,24 +239,50 @@ ggsave(here::here(figdir, "block_propgt30.png"), blk_pgt30, height = 7, width = 
 
 ggplot() +
   geom_sf(data = blockmap) +
+  geom_sf(data = by_block, aes(geometry = geometry, fill = pgt60)) +
+  scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, end = 0.9) +
+  labs(fill = "% > 60 days") +
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85))  -> blk_pgt60
+blk_pgt60
+
+ggsave(here::here(figdir, "block_propgt60.png"), blk_pgt60, height = 7, width = 10, units = "in")
+
+ggplot() +
+  geom_sf(data = blockmap) +
   geom_sf(data = by_block, aes(geometry = geometry, fill = pgt90)) +
-  scale_fill_viridis_c(option = "magma", na.value = "white", direction = -1, end = 0.9) +
+  scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, end = 0.9) +
   labs(fill = "% > 90 days") +
-  theme(axis.text = element_blank()) -> blk_pgt90
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) -> blk_pgt90
 blk_pgt90
 
 ggsave(here::here(figdir, "block_propgt90.png"), blk_pgt90, height = 7, width = 10, units = "in")
 
 # Join two block maps
-combined <- blk_pgt30 + blk_pgt90 +
+combined <- blk_pgt30 + blk_pgt60 +
   plot_annotation(title = "Proportion of cases diagnosed with excess delays",
                   caption = paste0("Diagnoses between ",
-                                   range(dat$diag_month)[1],
+                                   range(dat_indiv$diag_month)[1],
                                    " and ",
-                                   range(dat$diag_month)[2]))
+                                   range(dat_indiv$diag_month)[2]))
 combined
 
 ggsave(here::here(figdir, "excess_delay_byblock.png"), combined, height = 7, width = 14, units = "in")
+
+# ---------------------------------------------------------------------------- #
+# % ACD by block
+
+ggplot() +
+  geom_sf(data = blockmap) +
+  geom_sf(data = by_block, aes(geometry = geometry, fill = pACD)) +
+  scale_fill_viridis_c(option = "magma", na.value = "white", direction = -1, end = 0.9) +
+  labs(fill = "% via ACD") +
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) -> blk_pACD
+blk_pACD
+
+ggsave(here::here(figdir, "block_propACD.png"), blk_pACD, height = 7, width = 10, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # Bivariate map of delay and incidence
@@ -297,6 +300,20 @@ bv
 ggsave(here::here(figdir, "block_propgt30_byinc_bv.png"), bv, height = 7, width = 10, units = "in")
 
 # ---------------------------------------------------------------------------- #
+# Bivariate map of delay and % ACD
+
+by_block %>%
+  filter(!is.na(pgt30)) -> plotdat
+
+bv <- create_bivmap(blockmap, plotdat,
+                    xvar = "pgt30", yvar = "pACD",
+                    xlab = "% > 30 days", ylab = "% via ACD",
+                    pal = "DkBlue")
+bv
+
+ggsave(here::here(figdir, "block_propgt30_byACD_bv.png"), bv, height = 7, width = 10, units = "in")
+
+# ---------------------------------------------------------------------------- #
 # Semi-variogram
 
 dat.sp <- dat %>%
@@ -306,23 +323,45 @@ dat.sp <- dat %>%
 # convert simple data frame into a spatial data frame object
 coordinates(dat.sp) <- ~ longitude + latitude
 
-vg <- variogram(delay~1, data = dat)
+vg <- variogram(delay~1, data = dat, cressie = TRUE)
 plot(vg)
 
-vgmod <- vgm(psill =  800, model = "Mat", nugget = 1000, range = 100)
+vgmod <- vgm(psill =  300, model = "Mat", nugget = 400, range = 75)
 plot(vg, model = vgmod)
 
-vgfit <- fit.variogram(vg, model = vgmod)    
+vgfit <- fit.variogram(vg, model = vgmod, fit.kappa = FALSE)    
 plot(vg, model = vgfit)
 
 vgfit
 # model    psill    range kappa
-# Nug 927.8130  0.00000   0.0
-# Mat 935.2576 60.21329   0.5
+# Nug 331.6653  0.00000   0.0
+# Mat 348.8659 49.93885   0.5
 
 png(here::here(figdir, "delay_semivariogram.png"), height = 500, width = 600)
-plot(vg, model = vgfit)
+plot(vg, model = vgfit, xlab = "Distance (km)")
 dev.off()
+
+################################################################################
+
+dat.sp@coords <- geoR::jitterDupCoords(dat.sp@coords, max = 0.01)
+dat.geo <- geoR::as.geodata(dat.sp)
+
+vg <- variog(delay~1, data = dat.geo)
+env <- variog.mc.env(dat, obj.var = vg)
+plot(s100.vario, envelope = s100.env)
+
+## estimation of semi-variogram
+semi_variog <- variog(EXP_GRF)
+
+semi_variog_i <- semi_variog
+semi_variog_i$v <- NULL
+
+## the i-th empirocal semi-variogram
+semi_variog_i$v <- semi_variog$v[, i]
+
+## mc envelops
+env <- variog.mc.env(coords = EXP_GRF$coords, data = EXP_GRF$data[, i],
+                     obj.variog = semi_variog_i, nsim = 99, messages = FALSE)
 
 # ---------------------------------------------------------------------------- #
 # Tabulate
