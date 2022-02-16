@@ -4,14 +4,23 @@
 ################################################################################
 
 # Dev version of ggmap
+# install.packages("remotes")
+# remotes::install_github("inbo/inlatools")
 # devtools::install_github("dkahle/ggmap", force = TRUE)
 # devtools::install_github('joenomiddlename/PStestR', dependencies=T, build_vignettes=T)
 # remotes::install_github("gfalbery/ggregplot")
+# devtools::install_github(repo = "https://github.com/hrue/r-inla", ref = "stable", subdir = "rinla", build = FALSE)
+# install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+# INLA::inla.upgrade(testing = TRUE)
+
+options(collapse_mask = "manip") 
+library(collapse)
 
 # Packages required
-packages <- c("here","tidyverse","lubridate","gridExtra","sf","spdep","rgdal",
+packages <- c("here","tidyverse","lubridate", "magrittr", "gridExtra","sf","spdep","rgdal",
               "spatstat","ggspatial","ggmap","patchwork","scales","here", "gstat", 
-              "variosig", "biscale","INLA","inlabru", "ggregplot","mapr") #"inlatools",
+              "variosig", "biscale","INLA","inlabru", "inlatools", "ggregplot","mapr",
+              "INLAutils","brinla","rlist") 
 
 # Check and install if necessary
 installed_packages <- packages %in% rownames(installed.packages())
@@ -28,4 +37,6 @@ theme_set(theme_minimal())
 
 # Source helper functions
 list.files(here::here("code","utils"), full.names = TRUE) %>% purrr::walk(source)
+
+set.seed(1111)
 
