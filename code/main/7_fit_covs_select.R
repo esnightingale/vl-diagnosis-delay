@@ -14,7 +14,7 @@ covs_all <- list("age_s","sex1","comorb1","prv_txTRUE","caste4_r1",c("occ4_cat1"
               "occ4_cat2", "occ4_cat3"), "poss_acdTRUE",
              "block_endm_2017TRUE", "IRS_2017TRUE","inc_2017_gt0TRUE",
              "traveltime_s","traveltime_t_s", "rainTRUE")
-
+#c("age_cat.12.25.","age_cat.25.42.","age_cat.42.95.") 
 covs_pat1 <- list("age_s","sex1","comorb1","prv_txTRUE","caste4_r1","occ4_cat1",
                                                                    "occ4_cat2", "occ4_cat3") 
 covs_pat <- c(covs_pat1, list("poss_acdTRUE"))
@@ -30,7 +30,6 @@ covs.multi.list <- list(Patient = covs_pat1,
 
 mesh <- readRDS(here::here("data/analysis","mesh.rds")) 
 stk <- readRDS(here::here("data/analysis","stack.rds"))
-idx <- stk$data$index$train
 
 # Original sf object for plotting vgm
 dat <- read_data() 
@@ -41,7 +40,7 @@ family <- "poisson"
 # ---------------------------------------------------------------------------- #
 # Null fit
 
-f <- as.formula(paste0("delay ~ f(id, model = 'iid',
+f <- as.formula(paste0("y ~ f(id, model = 'iid',
                              prior = 'pc.prec', 
                              param = c(10, 0.01))"))
 
@@ -109,39 +108,38 @@ p_vgms_domain <- purrr::imap(fits.domain, function(x, nm) plot_vgm(x$fit$summary
                                                                   ylim = c(0.5,1)))
 
 # model     psill    range kappa
-# 1   Nug 0.7178848  0.00000   0.0
-# 2   Mat 0.1599971 21.48347   0.5
-# model     psill   range kappa
-# 1   Nug 0.7155354  0.0000   0.0
-# 2   Mat 0.1482357 20.8345   0.5
+# 1   Nug 0.7179050  0.00000   0.0
+# 2   Mat 0.1600005 21.48299   0.5
 # model     psill    range kappa
-# 1   Nug 0.6844628  0.00000   0.0
-# 2   Mat 0.1854364 20.17725   0.5
+# 1   Nug 0.7156381  0.00000   0.0
+# 2   Mat 0.1482520 20.83197   0.5
 # model     psill    range kappa
-# 1   Nug 0.6564759  0.00000   0.0
-# 2   Mat 0.1908629 18.72604   0.5
+# 1   Nug 0.6844554  0.00000   0.0
+# 2   Mat 0.1854343 20.17741   0.5
+# model     psill    range kappa
+# 1   Nug 0.6564771  0.00000   0.0
+# 2   Mat 0.1908631 18.72602   0.5
 # model     psill   range kappa
-# 1   Nug 0.6667537  0.0000   0.0
-# 2   Mat 0.1901310 18.9706   0.5
+# 1   Nug 0.6666980  0.0000   0.0
+# 2   Mat 0.1901168 18.9717   0.5
 
 # Compare travel time to diagnosis vs treatment
 plyr::llply(fits.domain, function(x) summary(x$fit))
 plyr::llply(fits.domain, function(x) x$fit$waic$waic) 
- 
 # $Patient
-# [1] 28578.39
+# [1] 28578.2
 # 
 # $`Patient + detection`
-# [1] 28579.89
+# [1] 28578.51
 # 
 # $Awareness
-# [1] 28586.42
+# [1] 28586.48
 # 
 # $`Access: diag`
-# [1] 28585.36
+# [1] 28585.52
 # 
 # $`Access: trt`
-# [1] 28584.67
+# [1] 28584.96
 
 # Treatment facility travel time has a somewhat larger coefficient, but neither 
 # significant on 95%CrI
@@ -163,8 +161,8 @@ fit.full <- init_inla(f, data.stack = stk, family = family)
 
 p_vgm_full <- plot_vgm(fit.full$fit$summary.random$id$mean, dat, title = "Fitted IID effects: Full model", ylim = c(0.5,1))
 # model     psill    range kappa
-# 1   Nug 0.7238765  0.00000   0.0
-# 2   Mat 0.1316701 20.82976   0.5
+# 1   Nug 0.7238787  0.00000   0.0
+# 2   Mat 0.1316704 20.82969   0.5
 
 # ---------------------------------------------------------------------------- #
 # Compare univariate versus multivariate coefficients

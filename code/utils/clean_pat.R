@@ -39,14 +39,9 @@ clean_pat <- function(file.path,
   if (length(delete_rows_id) > 0) {ll <- ll[-delete_rows_id,]}
 
   # Tally of diagnoses per patient, per case type
-  tally <- ll %>%
-    dplyr::group_by(res_patient_code, case_type) %>%
-    dplyr::tally()
-
-# ll <- ll %>%
-#   dplyr::full_join(loc_lookup) %>%
-#   dplyr::select(data_entry_state, data_entry_district, data_entry_block, sid, did, bid,
-#                 patient_state, patient_district, patient_block, patient_block_id, patient_sc, patient_sc_id, patient_village, vid, everything()) # %>% View()
+  # tally <- ll %>%
+  #   dplyr::group_by(res_patient_code, case_type) %>%
+  #   dplyr::tally()
 
   n.b <- ll %>%
     dplyr::select(data_entry_district,data_entry_block) %>%
@@ -61,8 +56,9 @@ clean_pat <- function(file.path,
   print(paste(nrow(ll),"Patients registered over", n.b,"unique blocks, residing in", n.v, "unique villages"))
 
   ll %>%
-    dplyr::select(res_patient_code, patient_id, sex, age, caste, special_caste,
-                  case_type, treated_for_ka_earlier, referred_by,
+    dplyr::mutate(across(where(is.character), as.factor)) %>%
+    dplyr::select(res_patient_code, patient_id, #sex, age, caste, special_caste,
+                  # case_type, #treated_for_ka_earlier, referred_by,
                   patient_state, patient_district,
                   patient_block, patient_block_id,
                   # state, district,
@@ -70,10 +66,8 @@ clean_pat <- function(file.path,
                   patient_village, vid, #vil_code,
                   data_entry_state, sid,
                   data_entry_district, did,
-                  data_entry_block, bid,
-                  internal_date) %>%
-  dplyr::mutate(across(where(is.character), as.factor)) -> final
-  
+                  data_entry_block, bid #, internal_date
+                  ) -> final
   sink()
 
   return(final)

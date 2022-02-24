@@ -14,8 +14,9 @@ read_data <- function(analysis = TRUE){
   
   dat <- readRDS(file.path(datadir,vill.path)) %>%
     # Matching code from external drive
-    full_join(readRDS("E:/vl-diagnosis-delay/data/code.rds")) %>%
-    right_join(readRDS(file.path(datadir, pat.path))) 
+    right_join(readRDS("E:/vl-diagnosis-delay/data/decode.rds")) %>%
+    right_join(readRDS(file.path(datadir, pat.path))) %>% 
+    sf::st_set_crs(7759)
   
   return(dat)
   

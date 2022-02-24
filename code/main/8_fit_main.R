@@ -23,8 +23,7 @@ covs.list <- list(None = NULL,
                   `Village awareness + access` = c(covs_vil_aware,covs_vil_access),
                   All = c(covs_pat, covs_vil_aware, covs_vil_access)) 
 
-# dat <- readRDS(here::here("data/analysis","dat_nona.rds")) %>%
-#   st_transform(crs = st_crs(7759))
+dat <- read_data()
 mesh <- readRDS(here::here("data/analysis","mesh.rds"))
 spde <- readRDS(here::here("data/analysis","spde.rds"))
 stk <- readRDS(here::here("data/analysis","stack.rds"))
@@ -132,6 +131,33 @@ refit.iid <- list(f = f.iid, fit = refit.iid)
 # saveRDS(refit.iid, here::here(outdir, "fit_covs_iid.rds"))
 
 #------------------------------------------------------------------------------#
+# Refit full model without any random effects
+
+f.fixed <- as.formula(paste0("y ~ -1 + Intercept +", 
+                           paste0(covs.list$All, collapse = " + ")))
+
+refit.fixed <- inla(f.fixed,
+                 family = "poisson",
+                 data = inla.stack.data(stk),
+                 control.predictor = list(
+                   compute = TRUE, link = 1,
+                   A = inla.stack.A(stk)),
+                 control.compute = list(waic = TRUE,
+                                        config = TRUE,
+                                        cpo = FALSE,
+                                        return.marginals.predictor = TRUE),
+                 # control.mode = list(result = fits.main$All, restart = TRUE),
+                 control.fixed = list(mean = 0,
+                                      prec = 0.1,
+                                      mean.intercept = 0,
+                                      prec.intercept = 0.1),
+                 verbose = TRUE)
+
+refit.fixed <- list(f = f.fixed, fit = refit.fixed)
+
+# saveRDS(refit.iid, here::here(outdir, "fit_covs_iid.rds"))
+
+#------------------------------------------------------------------------------#
 # Refit full model as binomial for delay > 30 days
 
 f.all <- as.formula(paste0("y ~ -1 + Intercept +", 
@@ -161,10 +187,71 @@ refit.bin <- list(f = f.all, fit = refit.bin)
 # saveRDS(refit.iid, here::here(outdir, "fit_full_bin.rds"))
 
 #------------------------------------------------------------------------------#
+# Refit with SPDE replicated by ACD
+
+# indexs <- inla.spde.make.index(name = "s",
+#                                   n.spde = spde$n.spde,
+#                                   n.repl = 2)
+# 
+# m <- nrow(dat)
+# A = inla.spde.make.A(mesh,
+#                      loc = st_coordinates(dat), 
+#                      index = rep(1:m, times = 2),
+#                      repl = rep(1:2, each = m))
+# 
+# # Covariates of interest
+# covs <- c("age_s","comorb","poss_acd",
+#           "block_endm_2017", "inc_2017_gt0", 
+#           "traveltime_t_s")
+# 
+# X <- model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))), 
+#                   data = dat)[,-1] 
+# 
+# stk_rep <- inla.stack(
+#   data = list(y = dat$delay),
+#   A = list(A, 1, 1),
+#   effects = list(s = indexs,  # the spatial index,
+#                  id = dat$id, # observation level index
+#                  data.frame(
+#                    Intercept = 1,
+#                    X) # covariate model matrix
+#   )
+# )
+# 
+# saveRDS(stk, here::here("data/analysis","stack_rep.rds"))
+# 
+# f.rep <- as.formula(paste0("y ~ -1 + Intercept +", 
+#                            paste0(covs.list$All, collapse = " + "), 
+#                            "+ f(id, model = 'iid',
+#                              prior = 'pc.prec', 
+#                              param = c(10, 0.01)) +
+#                             f(s, model = spde, replicate = s.repl)"))
+# 
+# refit.rep <- inla(f.rep,
+#                   family = "poisson",
+#                   data = inla.stack.data(stk),
+#                   control.predictor = list(
+#                     compute = TRUE, link = 1,
+#                     A = inla.stack.A(stk)),
+#                   control.compute = list(waic = TRUE,
+#                                          config = TRUE,
+#                                          cpo = FALSE,
+#                                          return.marginals.predictor = FALSE),
+#                   control.fixed = list(mean = 0,
+#                                        prec = 0.1,
+#                                        mean.intercept = 0,
+#                                        prec.intercept = 0.1),
+#                   verbose = TRUE)
+# refit.rep <- list(f = f.rep, fit = refit.rep)
+# 
+# saveRDS(refit.rep, here::here(outdir, "fit_full_repACD.rds"))
+
+#------------------------------------------------------------------------------#
 # Final model list
 
 fits.all <- append(fits.main,
-                   list(`All (IID only)` = refit.iid,
+                   list(`Fixed effects only` = refit.fixed,
+                        `All (IID only)` = refit.iid,
                         `All (SPDE only)` = refit.spde,
                         `All (Binomial)` = refit.bin))
 saveRDS(fits.all, here::here(outdir, "fits_final.rds"))

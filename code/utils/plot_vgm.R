@@ -1,7 +1,8 @@
-plot_vgm <- function(values, data, width, title = NULL, fit.kappa = FALSE, ylim = NULL){
+plot_vgm <- function(values, data, cutoff = NULL, title = NULL, fit.kappa = FALSE, ylim = NULL){
   
   vgm <- variogram(values ~ 1,
                    data, 
+                   # cutoff = cutoff,
                    # width = width,
                    cressie = TRUE)
 

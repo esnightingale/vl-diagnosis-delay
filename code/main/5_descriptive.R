@@ -15,14 +15,18 @@ dat <- read_data() %>%
   arrange(delay)
 
 # Setup map context
-blockmap <- readRDS(here::here("data","geography","blockmap.rds"))
-boundary <- readRDS(here::here("data","geography","boundary.rds"))
+blockmap <- readRDS(here::here("data","geography","blockmap.rds")) %>% 
+  sf::st_set_crs(7759)
+boundary <- readRDS(here::here("data","geography","boundary.rds")) %>% 
+  sf::st_set_crs(7759)
 boundary.spdf <- as_Spatial(boundary)
 
 ################################################################################
 # Overall summary
 
 summary(dat$delay)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.00   11.00   16.00   31.05   44.00  496.00
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 0.00   11.00   16.00   31.26   46.00  496.00 
 summary(dat$delay_cat5)
@@ -38,14 +42,14 @@ summary(dat$gt90)
 dat %>%
   ggplot(aes(x = dur_fev_r)) +
   geom_histogram(bins = 50) +
-  xlim(c(0,365)) +
+  xlim(c(0,250)) +
   geom_vline(xintercept = 14, lty = "dashed") +
-  annotate("text", x = 300, y = 300, size = 2, 
+  annotate("text", x = 200, y = 300, size = 2, 
            label = paste0("N = 24", #Axis cut at 365 days\n
                           # sum(dat$days_fever < 14),
                           " cases with < 14 days fever before diagnosis\nN = ",
-                          sum(dat$dur_fev_r > 365),
-                          " cases with > 365 days"
+                          sum(dat$dur_fev_r > 250),
+                          " cases with > 250 days"
                           )) +
   # facet_wrap(~diag_year) +
   labs(x = "Onset to diagnosis (days)", y = "Frequency") -> days_fever_hist
@@ -58,9 +62,7 @@ ggsave(here::here(figdir,"days_fever_hist.png"),
 ################################################################################
 # Observed delays over time
 
-dat_indiv <- readRDS(file.path(datadir,"analysisdata_individual.rds"))
-  
-dat_indiv %>%
+dat %>%
   st_drop_geometry() %>%
   group_by(diag_month) %>%
   dplyr::summarise(N = n(),
@@ -68,9 +70,9 @@ dat_indiv %>%
             median = median(delay, na.rm = T),
             q1 = Rmisc::CI(delay)[3],
             q3 = Rmisc::CI(delay)[1],
-            `> 90 days` = sum(delay > 90, na.rm = T)/N,
-            `31-90 days` = sum(between(delay,31,90), na.rm = T)/N,
-            `<= 30 days` = sum(delay <= 30, na.rm = T)/N) %>%
+            `> 90 days` = sum(dur_fev_r > 90, na.rm = T)/N,
+            `31-90 days` = sum(between(dur_fev_r,31,90), na.rm = T)/N,
+            `<= 30 days` = sum(dur_fev_r <= 30, na.rm = T)/N) %>%
   ungroup() -> by_mth
 
 by_mth %>%
@@ -202,7 +204,7 @@ dat %>%
             pgt90 = mean(gt90, na.rm = T)*100,
             pgt60 = mean(gt60, na.rm = T)*100,
             pgt30 = mean(gt30, na.rm = T)*100,
-            pACD = mean(detection == "ACD")*100) %>%
+            pACD = mean(poss_acd*100)) %>%
   mutate(delay_cat3 = cut(med_delay, c(0,15,90,730), include.lowest = TRUE, ordered_result = TRUE)) %>%
   ungroup() -> by_block
 
@@ -212,6 +214,17 @@ by_block <- blockmap %>%
   dplyr::mutate(pop = median(c_across(`2018`:`2019`)),
          inc = N*1e4/pop) %>%
   ungroup() 
+
+ggplot() +
+  geom_sf(data = blockmap) +
+  geom_sf(data = by_block, aes(geometry = geometry, fill = inc)) +
+  scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, trans = "log10", end = 0.9) +
+  labs(fill = "Incidence\nper 10,000") + 
+  theme(axis.text = element_blank(), panel.grid = element_blank(),
+        legend.position = c(0.9,0.85)) -> blk_inc
+blk_inc
+
+ggsave(here::here(figdir, "block_incidence.png"), blk_inc, height = 6, width = 8, units = "in")
 
 # pal3 <- viridis::viridis(3)
 ggplot() +
@@ -263,9 +276,9 @@ ggsave(here::here(figdir, "block_propgt90.png"), blk_pgt90, height = 7, width = 
 combined <- blk_pgt30 + blk_pgt60 +
   plot_annotation(title = "Proportion of cases diagnosed with excess delays",
                   caption = paste0("Diagnoses between ",
-                                   range(dat_indiv$diag_month)[1],
+                                   range(dat$diag_month)[1],
                                    " and ",
-                                   range(dat_indiv$diag_month)[2]))
+                                   range(dat$diag_month)[2]))
 combined
 
 ggsave(here::here(figdir, "excess_delay_byblock.png"), combined, height = 7, width = 14, units = "in")
@@ -287,31 +300,31 @@ ggsave(here::here(figdir, "block_propACD.png"), blk_pACD, height = 7, width = 10
 # ---------------------------------------------------------------------------- #
 # Bivariate map of delay and incidence
 
-by_block %>%
-  filter(!is.na(pgt30)) %>%
-  mutate(inc = replace_na(inc, 0)) -> plotdat
-
-bv <- create_bivmap(blockmap, plotdat,
-                   xvar = "pgt30", yvar = "inc",
-                   xlab = "% > 30 days", ylab = "Cases/10,000",
-                   pal = "DkBlue")
-bv
-
-ggsave(here::here(figdir, "block_propgt30_byinc_bv.png"), bv, height = 7, width = 10, units = "in")
+# by_block %>%
+#   filter(!is.na(pgt30)) %>%
+#   mutate(inc = replace_na(inc, 0)) -> plotdat
+# 
+# bv <- create_bivmap(blockmap, plotdat,
+#                    xvar = "pgt30", yvar = "inc",
+#                    xlab = "% > 30 days", ylab = "Cases/10,000",
+#                    pal = "DkBlue")
+# bv
+# 
+# ggsave(here::here(figdir, "block_propgt30_byinc_bv.png"), bv, height = 7, width = 10, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # Bivariate map of delay and % ACD
-
-by_block %>%
-  filter(!is.na(pgt30)) -> plotdat
-
-bv <- create_bivmap(blockmap, plotdat,
-                    xvar = "pgt30", yvar = "pACD",
-                    xlab = "% > 30 days", ylab = "% via ACD",
-                    pal = "DkBlue")
-bv
-
-ggsave(here::here(figdir, "block_propgt30_byACD_bv.png"), bv, height = 7, width = 10, units = "in")
+# 
+# by_block %>%
+#   filter(!is.na(pgt30)) -> plotdat
+# 
+# bv <- create_bivmap(blockmap, plotdat,
+#                     xvar = "pgt30", yvar = "pACD",
+#                     xlab = "% > 30 days", ylab = "% via ACD",
+#                     pal = "DkBlue")
+# bv
+# 
+# ggsave(here::here(figdir, "block_propgt30_byACD_bv.png"), bv, height = 7, width = 10, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # Semi-variogram
@@ -340,28 +353,6 @@ vgfit
 png(here::here(figdir, "delay_semivariogram.png"), height = 500, width = 600)
 plot(vg, model = vgfit, xlab = "Distance (km)")
 dev.off()
-
-################################################################################
-
-dat.sp@coords <- geoR::jitterDupCoords(dat.sp@coords, max = 0.01)
-dat.geo <- geoR::as.geodata(dat.sp)
-
-vg <- variog(delay~1, data = dat.geo)
-env <- variog.mc.env(dat, obj.var = vg)
-plot(s100.vario, envelope = s100.env)
-
-## estimation of semi-variogram
-semi_variog <- variog(EXP_GRF)
-
-semi_variog_i <- semi_variog
-semi_variog_i$v <- NULL
-
-## the i-th empirocal semi-variogram
-semi_variog_i$v <- semi_variog$v[, i]
-
-## mc envelops
-env <- variog.mc.env(coords = EXP_GRF$coords, data = EXP_GRF$data[, i],
-                     obj.variog = semi_variog_i, nsim = 99, messages = FALSE)
 
 # ---------------------------------------------------------------------------- #
 # Tabulate
@@ -403,17 +394,16 @@ make_plot <- function(t) {
   
 }
 
-dat.df %>%
+dat %>%
   dplyr::rename(Sex = sex,
                 Age = age_cat,
-                `Scheduled caste or tribe` = marg_caste,
-                Occupation = occupation,
-                `HIV status` = hiv,
+                `Scheduled caste or tribe` = caste4_r,
+                Occupation = occ4_cat,
+                `HIV status` = comorb,
                 `Previous VL/PKDL treatment` = prv_tx,
-                `Number of prior consultations` = conslt_cat,
-                Detection = detection,
+                Detection = poss_acd,
                 `Block endemic in 2017` = block_endm_2017,
-                `Village IRS targeted in 2017` = IRS_2017_1,
+                `Village IRS targeted in 2017` = IRS_2017,
                 `Village incidence > 0 in 2017` = inc_2017_gt0,
                 `Travel time to nearest diagnosis facility` = travel_time_cat,
                 `Travel time to nearest treatment facility` = travel_time_t_cat) -> dat.tab

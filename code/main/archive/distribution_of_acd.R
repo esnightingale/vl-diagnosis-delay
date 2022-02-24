@@ -20,7 +20,7 @@ source(here::here("code","setup_env.R"))
 figdir <- "figures/fit"
 outdir <- "output"
 
-dat <- readRDS(here::here("data/analysis","dat_fit_val.rds"))
+dat <- readRDS(here::here("data/analysis","dat_nona.rds"))
 mesh <- readRDS(here::here("data/analysis","mesh.rds"))
 spde <- readRDS(here::here("data/analysis","spde.rds"))
 
@@ -57,14 +57,14 @@ plyr::llply(fits.init, function(x) summary(x$fit))
 ggregplot::Efxplot(plyr::llply(fits.init, function(x) x$fit),
                    ModelNames = names(covs.list),
                    Intercept = FALSE)
-ggsave(here::here(figdir, "fits_init_efx.png"), height = 6, width = 8, units = "in", dpi = 320)
+# ggsave(here::here(figdir, "fits_init_efx.png"), height = 6, width = 8, units = "in", dpi = 320)
 
 #------------------------------------------------------------------------------#
 # Plot the fitted spatial fields
 
-pdf(here::here(figdir, "map_fitted_spdes.pdf"), height = 4, width = 15)
+# pdf(here::here(figdir, "map_fitted_spdes.pdf"), height = 4, width = 15)
 plyr::llply(fits.init, function(x) print(plot_spde(x)))
-dev.off()
+# dev.off()
 
 #------------------------------------------------------------------------------#
 

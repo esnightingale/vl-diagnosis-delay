@@ -36,7 +36,7 @@ make_f_spde <- function(r, s){
 
 f.list <- list()
 nm <- c()
-for (r in c(2, 10, 20, 50, 100, 500)){
+for (r in c(10, 20, 50, 100, 500)){
   for(s in c(0.1, 1, 5, 10, 50)){
     f <- make_f_spde(r, s)
     f.list <- rlist::list.append(f.list, f)
@@ -64,7 +64,7 @@ coo <- st_coordinates(dat)
 A <- inla.spde.make.A(mesh = mesh, loc = coo)
 
 dim(A)
-# 4271 3574
+# 4271 3674
 nrow(dat)
 
 # ---------------------------------------------------------------------------- #
@@ -118,97 +118,82 @@ fits.spde <- lapply(f.list, init_inla, data.stack = stk, family = "poisson")
 
 plyr::llply(fits.spde, function(x) x$fit$waic$waic)
 which.min(plyr::llply(fits.spde, function(x) x$fit$waic$waic))
-# Range 2: SD 5 
+# Range 50: SD 10 
 
-# $`Range 2: SD 0.1`
-# [1] 28612.76
-# 
-# $`Range 2: SD 1`
-# [1] 28590.37
-# 
-# $`Range 2: SD 5`
-# [1] 28570.42
-# 
-# $`Range 2: SD 10`
-# [1] 28576.42
-# 
-# $`Range 2: SD 50`
-# [1] 28577.87
-# 
 # $`Range 10: SD 0.1`
-# [1] 28585.7
+# [1] 28585.67
 # 
 # $`Range 10: SD 1`
-# [1] 28582.9
+# [1] 28583.77
 # 
 # $`Range 10: SD 5`
-# [1] 28581.22
+# [1] 28581.16
 # 
 # $`Range 10: SD 10`
-# [1] 28586.81
+# [1] 28605.66
 # 
 # $`Range 10: SD 50`
-# [1] 28584.72
+# [1] 28590.71
 # 
 # $`Range 20: SD 0.1`
-# [1] 28583.89
+# [1] 28584.25
 # 
 # $`Range 20: SD 1`
-# [1] 28587.98
+# [1] 28588.29
 # 
 # $`Range 20: SD 5`
-# [1] 28580.59
+# [1] 28580.57
 # 
 # $`Range 20: SD 10`
-# [1] 28582.06
+# [1] 28582.07
 # 
 # $`Range 20: SD 50`
-# [1] 28584.18
+# [1] 28584.16
 # 
 # $`Range 50: SD 0.1`
-# [1] 28591.46
+# [1] 28587.81
 # 
 # $`Range 50: SD 1`
-# [1] 28582.67
+# [1] 28582.66
 # 
 # $`Range 50: SD 5`
-# [1] 28585.85
+# [1] 28585.19
 # 
 # $`Range 50: SD 10`
-# [1] 28576.9
+# [1] 28576.97
 # 
 # $`Range 50: SD 50`
-# [1] 28591.27
+# [1] 28591.28
 # 
 # $`Range 100: SD 0.1`
-# [1] 28581.13
+# [1] 28583.8
 # 
 # $`Range 100: SD 1`
-# [1] 28584.01
+# [1] 28590.64
 # 
 # $`Range 100: SD 5`
-# [1] 28593.13
+# [1] 28593.07
 # 
 # $`Range 100: SD 10`
-# [1] 28582.83
+# [1] 28582.76
 # 
 # $`Range 100: SD 50`
-# [1] 28585.56
+# [1] 28585.91
 # 
 # $`Range 500: SD 0.1`
-# [1] 28589.19
+# [1] 28584.66
 # 
 # $`Range 500: SD 1`
-# [1] 28586.42
+# [1] 28586.44
 # 
 # $`Range 500: SD 5`
-# [1] 28585.49
+# [1] 28585.5
 # 
 # $`Range 500: SD 10`
 # [1] 28585.21
 # 
 # $`Range 500: SD 50`
-# [1] 28585.09
+# [1] 28586.36
 
 get_hyperpar <- function(x, nm){
   df <- x$fit$summary.hyperpar[,c(1,3,5)] %>% #
@@ -253,198 +238,168 @@ p_prec_id + p_range_s + p_sd_s
 dev.off()
 
 plyr::llply(fits.spde, function(x) x$fit$summary.hyperpar[,c(1,3,5)])
-# $`Range 2: SD 0.1`
-# mean 0.025quant 0.975quant
-# Precision for id  1.198045   1.148106  1.2394506
-# Range for s      39.194501  21.496682 67.8223201
-# Stdev for s       0.351706   0.294429  0.4061599
-# 
-# $`Range 2: SD 1`
-# mean 0.025quant 0.975quant
-# Precision for id  1.1616047  1.1086969  1.2077516
-# Range for s      29.9705983 19.7341518 45.0772375
-# Stdev for s       0.3811959  0.3199359  0.4379687
-# 
-# $`Range 2: SD 5`
-# mean 0.025quant 0.975quant
-# Precision for id  1.1052089  1.0612900  1.1575003
-# Range for s      14.3592746 10.5191355 20.3477236
-# Stdev for s       0.3491691  0.2970065  0.4084372
-# 
-# $`Range 2: SD 10`
-# mean 0.025quant 0.975quant
-# Precision for id 1.1382216  1.0771021   1.196699
-# Range for s      2.8355399  1.6904210   4.761299
-# Stdev for s      0.9584598  0.5691429   1.433829
-# 
-# $`Range 2: SD 50`
-# mean 0.025quant 0.975quant
-# Precision for id 1.136901   1.079709   1.197136
-# Range for s      1.376645   0.925455   2.058752
-# Stdev for s      1.854363   1.200303   2.623499
-# 
 # $`Range 10: SD 0.1`
 # mean 0.025quant 0.975quant
-# Precision for id  1.1126194  1.0515852  1.1675301
-# Range for s      38.8383270 23.8099893 62.8097824
-# Stdev for s       0.2874407  0.2290429  0.3538554
+# Precision for id  1.1126244  1.0516783  1.1675064
+# Range for s      38.8318464 23.8086032 62.8153502
+# Stdev for s       0.2874403  0.2290421  0.3538357
 # 
 # $`Range 10: SD 1`
 # mean 0.025quant 0.975quant
-# Precision for id  1.1152280  1.0577696   1.173452
-# Range for s      40.1711509 22.8806322  65.111731
-# Stdev for s       0.3395531  0.2676592   0.439550
+# Precision for id  1.1156040  1.0557623  1.1729665
+# Range for s      39.6992954 22.5353848 63.6412170
+# Stdev for s       0.3404149  0.2666802  0.4489077
 # 
 # $`Range 10: SD 5`
 # mean 0.025quant 0.975quant
-# Precision for id  1.1155141  1.0610493   1.175782
-# Range for s      43.1170954 23.9597789  74.738587
-# Stdev for s       0.3459616  0.2737011   0.431282
+# Precision for id  1.1154967  1.0610823  1.1759036
+# Range for s      43.1290311 23.9566259 74.8044705
+# Stdev for s       0.3460031  0.2736759  0.4312472
 # 
 # $`Range 10: SD 10`
 # mean 0.025quant 0.975quant
-# Precision for id  1.1331005  1.0802886  1.1811815
-# Range for s      52.7080854 30.8577787 84.5636474
-# Stdev for s       0.3617348  0.2618755  0.4912171
+# Precision for id  1.0846938  0.9538754  1.1723652
+# Range for s      52.6719774 30.8451210 84.4895615
+# Stdev for s       0.3616714  0.2619195  0.4911669
 # 
 # $`Range 10: SD 50`
-# mean 0.025quant 0.975quant
-# Precision for id  1.1349214  1.0836869  1.1818135
-# Range for s      55.6942854 26.4621105 96.6001983
-# Stdev for s       0.3708073  0.2581311  0.5546141
+# mean   0.025quant   0.975quant
+# Precision for id   1.02135762 9.660428e-01    1.0703637
+# Range for s      892.12623634 2.690338e+02 2224.5666252
+# Stdev for s        0.05668075 9.686432e-03    0.1974295
 # 
 # $`Range 20: SD 0.1`
 # mean 0.025quant  0.975quant
-# Precision for id  1.0894832  1.0383494   1.1454294
-# Range for s      81.0917972 52.5103458 111.1611874
-# Stdev for s       0.2685568  0.2185472   0.3331646
+# Precision for id  1.0896221  1.0382649   1.1448040
+# Range for s      80.0284298 51.6795990 109.8380738
+# Stdev for s       0.2651789  0.2164713   0.3281386
 # 
 # $`Range 20: SD 1`
 # mean 0.025quant 0.975quant
-# Precision for id  1.1216382  1.0431366  1.1832949
-# Range for s      36.9594334 24.3626898 56.1853266
-# Stdev for s       0.3386045  0.2502041  0.4187178
+# Precision for id  1.1213069  1.0417829  1.1834261
+# Range for s      36.9902330 24.3752517 56.2749585
+# Stdev for s       0.3386634  0.2502563  0.4187819
 # 
 # $`Range 20: SD 5`
 # mean 0.025quant 0.975quant
-# Precision for id  1.1098806  1.0549276  1.1752018
-# Range for s      49.1872954 24.7526903 83.5341272
-# Stdev for s       0.3562171  0.2731213  0.4626895
+# Precision for id  1.1098714  1.0549028  1.1752996
+# Range for s      49.1951904 24.7603479 83.5400571
+# Stdev for s       0.3562196  0.2731065  0.4627392
 # 
 # $`Range 20: SD 10`
 # mean 0.025quant  0.975quant
-# Precision for id   1.0997112  1.0464235   1.1550611
-# Range for s      144.1633608 77.4750146 235.9913874
-# Stdev for s        0.5818093  0.3834856   0.8255426
+# Precision for id   1.0996845   1.046367   1.1550070
+# Range for s      144.1660190  77.267190 236.2661270
+# Stdev for s        0.5810323   0.382587   0.8250711
 # 
 # $`Range 20: SD 50`
 # mean 0.025quant 0.975quant
-# Precision for id   1.095134   1.042867   1.150119
-# Range for s      475.900679 351.934123 665.435903
-# Stdev for s        1.521044   1.151447   2.030308
+# Precision for id   1.095189   1.042938   1.150214
+# Range for s      476.529463 353.147495 665.773612
+# Stdev for s        1.523797   1.155395   2.029421
 # 
 # $`Range 50: SD 0.1`
 # mean 0.025quant 0.975quant
-# Precision for id  1.1374070  1.0879995  1.1800335
-# Range for s      55.0260679 34.2805598 81.6548054
-# Stdev for s       0.2854289  0.2164926  0.3674007
+# Precision for id  1.1027814  1.0355558   1.159082
+# Range for s      63.1338034 40.8447112  90.788704
+# Stdev for s       0.2953545  0.2111046   0.375904
 # 
 # $`Range 50: SD 1`
 # mean 0.025quant  0.975quant
-# Precision for id  1.1004081   1.048021   1.1615705
-# Range for s      77.5610910  30.351473 142.1524067
-# Stdev for s       0.3784106   0.251525   0.5201863
+# Precision for id  1.1003987  1.0480171   1.1615916
+# Range for s      78.2786295 31.2608734 142.8338252
+# Stdev for s       0.3791411  0.2529505   0.5207186
 # 
 # $`Range 50: SD 5`
-# mean 0.025quant 0.975quant
-# Precision for id  1.1106171  1.0481159   1.165705
-# Range for s      80.7953006 50.3170172 128.666378
-# Stdev for s       0.4250843  0.2897382   0.562378
+# mean 0.025quant  0.975quant
+# Precision for id  1.1104604  1.0498655   1.1650648
+# Range for s      80.9400445 50.3876698 128.9066366
+# Stdev for s       0.4248773  0.2912753   0.5612059
 # 
 # $`Range 50: SD 10`
 # mean  0.025quant 0.975quant
-# Precision for id   1.096997   1.0420533   1.170560
-# Range for s      318.036048 168.1799147 550.764298
-# Stdev for s        1.108299   0.6066277   1.858094
+# Precision for id   1.096920   1.0420826   1.170205
+# Range for s      318.099793 168.8113604 549.662656
+# Stdev for s        1.108565   0.6087734   1.854747
 # 
 # $`Range 50: SD 50`
 # mean   0.025quant   0.975quant
-# Precision for id    1.0232649    0.9684924    1.0700990
-# Range for s      4758.9183450 3348.7579682 6771.7796756
-# Stdev for s         0.2974017    0.1994630    0.4156199
+# Precision for id    1.0235434    0.9689547    1.0699531
+# Range for s      4718.2399087 3403.7407883 6539.6219938
+# Stdev for s         0.2959752    0.2076895    0.3975926
 # 
 # $`Range 100: SD 0.1`
 # mean 0.025quant  0.975quant
-# Precision for id  1.0988030  1.0466283   1.1641650
-# Range for s      86.1052196 55.7031623 120.8686531
-# Stdev for s       0.3771583  0.2939856   0.4601575
+# Precision for id  1.0997272  1.0471058   1.1544839
+# Range for s      87.2394807 51.4891252 128.5592177
+# Stdev for s       0.3783555  0.2966019   0.4590371
 # 
 # $`Range 100: SD 1`
-# mean 0.025quant  0.975quant
-# Precision for id   1.0979530  1.0440789   1.1539288
-# Range for s      137.3921928 57.6858572 236.0120991
-# Stdev for s        0.5123867  0.2053289   0.9006916
+# mean  0.025quant  0.975quant
+# Precision for id   1.0974764   1.0236118   1.1541867
+# Range for s      164.7281969 123.5891945 219.4352470
+# Stdev for s        0.6086652   0.4678703   0.7854296
 # 
 # $`Range 100: SD 5`
 # mean 0.025quant  0.975quant
-# Precision for id   1.093690  1.0038737   1.1587301
-# Range for s      114.241921 66.8393485 189.8236313
-# Stdev for s        0.478473  0.3363318   0.6706747
+# Precision for id   1.0938053  1.0041862   1.1587744
+# Range for s      114.2839682 66.8339774 190.0344913
+# Stdev for s        0.4788014  0.3364372   0.6711525
 # 
 # $`Range 100: SD 10`
 # mean 0.025quant  0.975quant
-# Precision for id  1.1040845  1.0511984   1.1617718
-# Range for s      93.7932892 46.0700307 181.9577883
-# Stdev for s       0.4202386  0.2981698   0.5695371
+# Precision for id  1.1016555  1.0493779   1.1599057
+# Range for s      91.4796235 46.4115830 165.9535711
+# Stdev for s       0.4185431  0.2997614   0.5820758
 # 
 # $`Range 100: SD 50`
 # mean  0.025quant  0.975quant
-# Precision for id    1.092652  1.04045349    1.147508
-# Range for s      1069.594780 47.02749867 4049.130422
-# Stdev for s         3.353959  0.07254165   14.941932
+# Precision for id    1.096474    1.042000    1.149680
+# Range for s      1455.243811 1035.439341 2246.859352
+# Stdev for s         4.529823    3.358466    6.381403
 # 
 # $`Range 500: SD 0.1`
 # mean   0.025quant   0.975quant
-# Precision for id 1.019099e+00 9.685581e-01 1.067129e+00
-# Range for s      1.993132e+04 6.692386e+02 9.990379e+04
-# Stdev for s      5.759631e-03 1.281536e-04 2.647154e-02
+# Precision for id 1.019068e+00 9.644123e-01 1.068751e+00
+# Range for s      1.300044e+04 9.695584e+03 1.924811e+04
+# Stdev for s      1.317468e-02 2.259121e-03 5.969245e-02
 # 
 # $`Range 500: SD 1`
 # mean  0.025quant 0.975quant
-# Precision for id   1.093966   1.0746805   1.111822
-# Range for s      403.835389 298.5367829 519.813800
-# Stdev for s        1.118522   0.6792547   1.653826
+# Precision for id   1.094006   1.0692091   1.117649
+# Range for s      406.431135 289.1681868 553.050256
+# Stdev for s        1.131130   0.6507759   1.833972
 # 
 # $`Range 500: SD 5`
 # mean  0.025quant  0.975quant
-# Precision for id   1.092314   1.0397057    1.147101
-# Range for s      752.438647 178.8217222 1656.335547
-# Stdev for s        2.073037   0.3349939    5.203954
+# Precision for id   1.092310   1.0397103    1.147099
+# Range for s      749.873010 175.6836293 1657.757184
+# Stdev for s        2.065357   0.3286333    5.202154
 # 
 # $`Range 500: SD 10`
 # mean 0.025quant  0.975quant
-# Precision for id    1.092112   1.039448    1.146763
-# Range for s      1551.978107 784.693961 3046.910126
-# Stdev for s         4.371278   2.358620    8.216782
+# Precision for id    1.092109   1.039442    1.146756
+# Range for s      1551.639457 785.058561 3044.704282
+# Stdev for s         4.370104   2.359405    8.211238
 # 
 # $`Range 500: SD 50`
 # mean  0.025quant  0.975quant
-# Precision for id    1.094315    1.041410    1.148883
-# Range for s      3384.538577 1099.777098 8547.507494
-# Stdev for s         8.893782    4.253304   16.361314
+# Precision for id    1.094845    1.040025    1.148007
+# Range for s      3030.449747 1047.185031 6915.202515
+# Stdev for s         8.837375    2.902067   19.867621
 
 # Project fitted SPDEs
 p.list <- purrr::imap(fits.spde, function(x, nm) plot_spde_mean(x$fit, nm, limits = c(-1,1))) # limit1 = c(-1,1), limit2 = c(0,1.5))) 
 png(here::here(figdir, "compare_spde_priors_new.png"), height = 6000, width = 10000, res = 350) 
-gridExtra::grid.arrange(grobs = p.list) #plyr::llply(fits, function(x) plot_spde(x$fit))
+gridExtra::grid.arrange(grobs = p.list)
 dev.off()
 
 rlist::list.save(fits.spde, here::here(outdir, "fits_compare_priors.rds"))
 
 # Select SPDE prior for modelling
 spde <- inla.spde2.pcmatern(mesh = mesh, 
-                            prior.range = c(10, 0.01), # P(range < U) = a
-                            prior.sigma = c(5, 0.01), # P(sigma > U) = a
+                            prior.range = c(50, 0.01), # P(range < U) = a
+                            prior.sigma = c(10, 0.01), # P(sigma > U) = a
                             constr = TRUE)
 saveRDS(spde, here::here("data/analysis","spde.rds"))
 

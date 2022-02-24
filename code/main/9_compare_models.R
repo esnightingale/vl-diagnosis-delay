@@ -105,9 +105,9 @@ c("Intercept",
   # "Travel time*rainy season"
   ) -> axis.labs
 
-png(here::here(figdir, "fitted_effects_main.png"), height = 6, width = 8, unit = "in", res = 320)
-Efxplot(lapply(fits[c(10,9)], function(x) x$fit),
-        ModelNames = c("Non-spatial","Spatial"),
+png(here::here(figdir, "fitted_effects_main_alt.png"), height = 6, width = 8, unit = "in", res = 320)
+Efxplot(lapply(fits[c(1,10,9)], function(x) x$fit),
+        ModelNames = c("Fixed effects only","Non-spatial random effects","Spatial random effects"),
         Intercept = FALSE,
         exp = TRUE,
         # VarOrder= rev(order),

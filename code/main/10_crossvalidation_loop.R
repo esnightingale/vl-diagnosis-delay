@@ -32,7 +32,7 @@ indexs <- inla.spde.make.index("s", spde$n.spde)
 boundary <- readRDS(here::here("data","geography","boundary.rds")) 
 
 # Covariates of interest
-covs <- c("age_s","comorb1", "poss_acd",
+covs <- c("age_s","comorb", "poss_acd",
           "block_endm_2017", "inc_2017_gt0", 
           "traveltime_t_s")
 
@@ -40,12 +40,12 @@ covs <- c("age_s","comorb1", "poss_acd",
 M = 10
 
 # Percentage withheld for testing
-# type = "nonspatial"
-# test_prop = 0.1
+type = "nonspatial"
+test_prop = 0.1
 
 # Radius of exclusion - 10km
-type = "spatial"
-r = 10
+# type = "spatial"
+# r = 10
 
 # Exceedance cutoff
 C = 30
