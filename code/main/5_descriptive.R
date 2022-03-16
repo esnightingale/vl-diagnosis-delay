@@ -59,6 +59,11 @@ ggsave(here::here(figdir,"days_fever_hist.png"),
        days_fever_hist,
        height = 4, width = 5, units = "in")
 
+plot_vgm(dat$delay, dat, title = "Observed delay")
+#   model    psill    range kappa
+# 1   Nug 331.7657  0.00000   0.0
+# 2   Mat 348.9317 49.96614   0.5
+
 ################################################################################
 # Observed delays over time
 
@@ -116,7 +121,7 @@ ggplot() +
   theme(axis.text = element_blank(), panel.grid = element_blank(),
         legend.position = c(0.9,0.85)) 
 
-ggsave(here::here("figures/descriptive/fig1_block.png"), height = 7, width = 9, units = "in")
+ggsave(here::here("figures/descriptive/fig1_block.png"), height = 6, width = 8, units = "in")
 
 ggplot() +
   geom_sf(data = boundary, fill = NA) +
@@ -129,7 +134,7 @@ ggplot() +
 #   annotation_scale(location = "br") +
 #   annotation_north_arrow(location = "tr", pad_x = unit(2, "cm"), pad_y = unit(1, "cm"))
 
-ggsave(here::here("figures/descriptive/fig1_state.png"), height = 7, width = 9, units = "in")
+ggsave(here::here("figures/descriptive/fig1_state.png"), height = 6, width = 8, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # By village
@@ -216,14 +221,15 @@ by_block <- blockmap %>%
   ungroup() 
 
 ggplot() +
-  geom_sf(data = blockmap) +
   geom_sf(data = by_block, aes(geometry = geometry, fill = inc)) +
-  scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, trans = "log10", end = 0.9) +
+  geom_sf(data = blockmap, fill = NA) +
+  scale_fill_viridis_c(option = "plasma", na.value = "white", direction = 1, trans = "log10", end = 0.9) +
   labs(fill = "Incidence\nper 10,000") + 
   theme(axis.text = element_blank(), panel.grid = element_blank(),
         legend.position = c(0.9,0.85)) -> blk_inc
 blk_inc
 
+saveRDS(by_block, here::here("data","geography","by_block.rds"))
 ggsave(here::here(figdir, "block_incidence.png"), blk_inc, height = 6, width = 8, units = "in")
 
 # pal3 <- viridis::viridis(3)
@@ -236,7 +242,7 @@ ggplot() +
         legend.position = c(0.9,0.85)) -> blk_med_delay
 blk_med_delay
 
-ggsave(here::here(figdir, "block_med_delay.png"), blk_med_delay, height = 7, width = 10, units = "in")
+ggsave(here::here(figdir, "block_med_delay.png"), blk_med_delay, height = 6, width = 8, units = "in")
 
 ggplot() +
   geom_sf(data = blockmap) +
@@ -247,7 +253,7 @@ ggplot() +
         legend.position = c(0.9,0.85)) -> blk_pgt30
 blk_pgt30
 
-ggsave(here::here(figdir, "block_propgt30.png"), blk_pgt30, height = 7, width = 10, units = "in")
+ggsave(here::here(figdir, "block_propgt30.png"), blk_pgt30, height = 6, width = 8, units = "in")
 
 
 ggplot() +
@@ -259,7 +265,7 @@ ggplot() +
         legend.position = c(0.9,0.85))  -> blk_pgt60
 blk_pgt60
 
-ggsave(here::here(figdir, "block_propgt60.png"), blk_pgt60, height = 7, width = 10, units = "in")
+ggsave(here::here(figdir, "block_propgt60.png"), blk_pgt60, height = 6, width = 8, units = "in")
 
 ggplot() +
   geom_sf(data = blockmap) +
@@ -270,7 +276,7 @@ ggplot() +
         legend.position = c(0.9,0.85)) -> blk_pgt90
 blk_pgt90
 
-ggsave(here::here(figdir, "block_propgt90.png"), blk_pgt90, height = 7, width = 10, units = "in")
+ggsave(here::here(figdir, "block_propgt90.png"), blk_pgt90, height = 6, width = 8, units = "in")
 
 # Join two block maps
 combined <- blk_pgt30 + blk_pgt60 +
@@ -295,7 +301,7 @@ ggplot() +
         legend.position = c(0.9,0.85)) -> blk_pACD
 blk_pACD
 
-ggsave(here::here(figdir, "block_propACD.png"), blk_pACD, height = 7, width = 10, units = "in")
+ggsave(here::here(figdir, "block_propACD.png"), blk_pACD, height = 6, width = 8, units = "in")
 
 # ---------------------------------------------------------------------------- #
 # Bivariate map of delay and incidence

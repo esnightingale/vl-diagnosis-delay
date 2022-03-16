@@ -43,7 +43,7 @@ M = 10
 type = "nonspatial"
 test_prop = 0.1
 
-# Radius of exclusion - 10km
+# Radius of exclusion - 20km
 # type = "spatial"
 # r = 10
 

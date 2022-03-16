@@ -36,8 +36,8 @@ make_f_spde <- function(r, s){
 
 f.list <- list()
 nm <- c()
-for (r in c(10, 20, 50, 100, 500)){
-  for(s in c(0.1, 1, 5, 10, 50)){
+for (r in c(10, 20, 50, 100)){
+  for(s in c(10, 20, 50)){
     f <- make_f_spde(r, s)
     f.list <- rlist::list.append(f.list, f)
     nm <- c(nm, paste0("Range ",r, ": SD ", s))

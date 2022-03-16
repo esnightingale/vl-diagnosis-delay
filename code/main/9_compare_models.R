@@ -25,7 +25,7 @@ fits <- readRDS(here::here(outdir,"fits_final.rds"))
 # null model
 fit.null <- readRDS(here::here(outdir,"univariate", "fit_null.rds"))
 
-fits <- rlist::list.prepend(fits, fit.null)
+fits <- rlist::list.prepend(fits[-9], fit.null) # exclude interaction fit
 names(fits)[1] <- "Null"
 
 # Cut off for exceedances
@@ -64,6 +64,45 @@ dev.off()
 # pdf(here::here(figdir,"obs_vs_fitted.pdf"), height = 7, width = 8)
 # purrr::imap(obs_vs_fitted, function(x, nm) plot_resids(x, name = nm))
 # dev.off()
+
+#------------------------------------------------------------------------------#
+# Precision of IID effects and spatial range/SD
+
+fits$Null$fit$summary.hyperpar
+#                      mean         sd 0.025quant 0.5quant 0.975quant     mode
+# Precision for id 1.020131 0.02418332  0.9724507 1.019738   1.068401 1.017056
+
+fits$`All (IID only)`$fit$summary.hyperpar
+#                      mean         sd 0.025quant 0.5quant 0.975quant     mode
+# Precision for id 1.077161 0.02572244   1.026203 1.076932   1.128319 1.075659
+
+fits$All$fit$summary.hyperpar
+#                        mean          sd 0.025quant   0.5quant 0.975quant       mode
+# Precision for id  1.1652845  0.03121173  1.1014187  1.1664947  1.2237411  1.1714110
+# Range for s      47.2586851 14.85399471 26.1310378 44.5197495 83.5768644 39.5595050
+# Stdev for s       0.3239117  0.04817799  0.2297483  0.3248052  0.4163401  0.3308667
+
+#------------------------------------------------------------------------------#
+# Spatial correlation in fitted IID effects
+
+p_vgm_null <- plot_vgm(fits$Null$fit$summary.random$id$mean, dat, title = "Null model",ylim = c(0.5,1))
+
+p_vgm_select <- plot_vgm(fits$`All (IID only)`$fit$summary.random$id$mean, dat, title = "Selected covariates, non-spatial model",ylim = c(0.5,1))
+
+p_vgm_final <- plot_vgm(fits$All$fit$summary.random$id$mean, dat, title = "Selected covariates, spatial model",ylim = c(0.5,1))
+
+png(here::here(figdir, "vgms_null_select_final.png"), height = 500, width = 1500)
+gridExtra::grid.arrange(p_vgm_null, p_vgm_select, p_vgm_final, nrow = 1)
+dev.off()
+
+coo <- sf::st_coordinates(dat)
+png(here::here(figdir, "MI_null_select_final.png"), height = 400, width = 1200)
+par(mfrow = c(1,3))
+lapply(list(Null = fits$Null$fit$summary.random$id$mean,
+            IID = fits$`All (IID only)`$fit$summary.random$id$mean,
+            Final = fits$All$fit$summary.random$id$mean),
+       function(x) calc_MI(x,coo, range = 30))
+dev.off()
 
 #------------------------------------------------------------------------------#
 # Summary measures of variation in SPDE/IID effects (mean absolute values:
@@ -105,8 +144,8 @@ c("Intercept",
   # "Travel time*rainy season"
   ) -> axis.labs
 
-png(here::here(figdir, "fitted_effects_main_alt.png"), height = 6, width = 8, unit = "in", res = 320)
-Efxplot(lapply(fits[c(1,10,9)], function(x) x$fit),
+png(here::here(figdir, "fitted_effects_main.png"), height = 6, width = 8, unit = "in", res = 320)
+Efxplot(lapply(fits[c(10, 11, 9)], function(x) x$fit),
         ModelNames = c("Fixed effects only","Non-spatial random effects","Spatial random effects"),
         Intercept = FALSE,
         exp = TRUE,
@@ -133,8 +172,8 @@ Efxplot(lapply(fits[3:9], function(x) x$fit),
 dev.off()
 
 png(here::here(figdir, "fitted_effects_supp2.png"), height = 6, width = 8, unit = "in", res = 320)
-Efxplot(lapply(fits[c(10,9,12)], function(x) x$fit),
-                   ModelNames = c("Non-spatial","Spatial","Binomial"),
+Efxplot(lapply(fits[c(11,9,13)], function(x) x$fit),
+                   ModelNames = c("Non-spatial (IID)", "Spatial (IID+SPDE)","Spatial (Binomial likelihood)"),
                    Intercept = FALSE,
                    exp = TRUE,
                    # VarOrder= rev(order),
@@ -150,31 +189,33 @@ dev.off()
 # Compare fitted SPDEs
 
 # Exclude IID-only model here
-spde.fits <- fits[-which(names(fits) %in% c("Null","All (IID only)"))] 
+spde.fits <- fits[-which(names(fits) %in% c("Null","All (IID only)", "Fixed effects only"))] 
+
+names <- gsub("\\+", "+\n", names(spde.fits))
 
 # Compare range and SD posteriors:
-spde.range <- bind_rows(plyr::llply(spde.fits, function(x) x$fit$summary.hyperpar["Range for s",c(1,3,5)])) %>%
-  mutate(Model = 1:length(spde.fits))
+spde.range <- bind_rows(plyr::llply(spde.fits, function(x) x$fit$summary.hyperpar["Range for s",c(1,3,5)])) %>% 
+  dplyr::mutate(Model = 1:length(spde.fits))
 
-png(here::here(figdir, "mod_compare_spde_range.png"), height = 1500, width = 3000, res = 300)
+png(here::here(figdir, "mod_compare_spde_range.png"), height = 1500, width = 3500, res = 300)
 ggplot(spde.range, aes(Model, mean, ymin = `0.025quant`, ymax = `0.975quant`)) +
   geom_errorbar(width = 0.5) +
   geom_point() +
-  labs(y = "Range") +
+  labs(y = "Range", x = "") +
   scale_x_discrete(limits = factor(1:10), 
-                   labels = names(spde.fits)) +
-  scale_y_continuous(trans = "log10",labels = scales::number_format(accuracy = 1000))
+                   labels = names) #+
+  # scale_y_continuous(trans = "log10",labels = scales::number_format(accuracy = 1000))
 dev.off()
 
 spde.sd <- bind_rows(plyr::llply(spde.fits, function(x) x$fit$summary.hyperpar["Stdev for s",c(1,3,5)])) %>%
   mutate(Model = 1:length(spde.fits)) 
 
-png(here::here(figdir, "mod_compare_spde_stdev.png"), height = 1500, width = 3000, res = 300)
+png(here::here(figdir, "mod_compare_spde_stdev.png"), height = 1500, width = 3500, res = 300)
 ggplot(spde.sd, aes(Model, mean, ymin = `0.025quant`, ymax = `0.975quant`)) +
   geom_errorbar(width = 0.5) +
   geom_point() +
-  labs(y = "Stdev") +
-  scale_x_discrete(limits = factor(1:10), labels = names(spde.fits)) +
+  labs(y = "Stdev", x = "") +
+  scale_x_discrete(limits = factor(1:10), labels = names) +
   scale_y_continuous(trans = "log10")
 dev.off()
 

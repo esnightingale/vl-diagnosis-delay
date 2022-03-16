@@ -10,17 +10,27 @@ source(here::here("code","setup_env.R"))
 figdir <- "figures/fit/univariate"
 outdir <- "output/univariate"
 
-covs_all <- list("age_s","sex1","comorb1","prv_txTRUE","caste4_r1",c("occ4_cat1",
-              "occ4_cat2", "occ4_cat3"), "poss_acdTRUE",
-             "block_endm_2017TRUE", "IRS_2017TRUE","inc_2017_gt0TRUE",
-             "traveltime_s","traveltime_t_s", "rainTRUE")
+# covs_all <- list("age_s","sex1","comorb1","prv_txTRUE","caste4_r1",c("occ4_cat1",
+#               "occ4_cat2", "occ4_cat3"), "poss_acdTRUE",
+#              "block_endm_2017TRUE", "IRS_2017TRUE","inc_2017_gt0TRUE",
+#              "traveltime_s","traveltime_t_s", "rainTRUE")
+# #c("age_cat.12.25.","age_cat.25.42.","age_cat.42.95.") 
+# covs_pat1 <- list("age_s","sex1","comorb1","prv_txTRUE","caste4_r1","occ4_cat1",
+#                                                                    "occ4_cat2", "occ4_cat3") 
+# covs_pat <- c(covs_pat1, list("poss_acdTRUE"))
+# covs_aware <- list("block_endm_2017TRUE", "IRS_2017TRUE","inc_2017_gt0TRUE")
+# covs_accessD <- list("traveltime_s", "rainTRUE")
+# covs_accessT <- list("traveltime_t_s", "rainTRUE") 
+
+covs_all <- list("age_s","sex","comorb","prv_tx","caste4_r","occ4_cat", "poss_acd",
+                 "block_endm_2017", "IRS_2017","inc_2017_gt0",
+                 "traveltime_s","traveltime_t_s", "rain")
 #c("age_cat.12.25.","age_cat.25.42.","age_cat.42.95.") 
-covs_pat1 <- list("age_s","sex1","comorb1","prv_txTRUE","caste4_r1","occ4_cat1",
-                                                                   "occ4_cat2", "occ4_cat3") 
-covs_pat <- c(covs_pat1, list("poss_acdTRUE"))
-covs_aware <- list("block_endm_2017TRUE", "IRS_2017TRUE","inc_2017_gt0TRUE")
-covs_accessD <- list("traveltime_s", "rainTRUE")
-covs_accessT <- list("traveltime_t_s", "rainTRUE") 
+covs_pat1 <- list("age_s","sex","comorb","prv_tx","caste4_r","occ4_cat") 
+covs_pat <- c(covs_pat1, list("poss_acd"))
+covs_aware <- list("block_endm_2017", "IRS_2017","inc_2017_gt0")
+covs_accessD <- list("traveltime_s", "rain")
+covs_accessT <- list("traveltime_t_s", "rain") 
 
 covs.multi.list <- list(Patient = covs_pat1, 
                         `Patient + detection` = covs_pat, 
@@ -29,10 +39,11 @@ covs.multi.list <- list(Patient = covs_pat1,
                         `Access: trt` = covs_accessT)
 
 mesh <- readRDS(here::here("data/analysis","mesh.rds")) 
-stk <- readRDS(here::here("data/analysis","stack.rds"))
+# stk <- readRDS(here::here("data/analysis","stack.rds"))
 
 # Original sf object for plotting vgm
-dat <- read_data() 
+dat <- read_data() %>% 
+  mutate(y = delay)
 
 # Specify likelihood family = NB or Poisson
 family <- "poisson"
@@ -42,14 +53,14 @@ family <- "poisson"
 
 f <- as.formula(paste0("y ~ f(id, model = 'iid',
                              prior = 'pc.prec', 
-                             param = c(10, 0.01))"))
+                             param = c(1, 0.01))"))
 
 fit.null <- inla(f,
                   family = family,
-                  data = inla.stack.data(stk),
+                  # data = inla.stack.data(stk),
+                  data = dat,
                   control.predictor = list(
-                    compute = TRUE, link = 1,
-                    A = inla.stack.A(stk)),
+                    compute = TRUE, link = 1), #,A = inla.stack.A(stk)),
                   control.compute = list(waic = TRUE, 
                                          config = TRUE,
                                          cpo = FALSE,
@@ -66,8 +77,8 @@ p_vgm_null <- plot_vgm(fit.null$fit$summary.random$id$mean, dat, title = "Fitted
 # 1   Nug 0.5942502  0.00000   0.0
 # 2   Mat 0.2564780 30.99597   0.5
 # model     psill    range kappa
-# 1   Nug 0.6274121  0.00000   0.0
-# 2   Mat 0.1936387 18.62789   0.5
+# 1   Nug 0.6265227  0.00000   0.0
+# 2   Mat 0.1938768 18.59652   0.5
 
 # Estimated variogram not sensitive to choice of prior precision
 
@@ -83,12 +94,12 @@ fit_covs <- function(cov) {
                          paste0(cov, collapse = " + "), 
                          "+ f(id, model = 'iid',
                              prior = 'pc.prec', 
-                             param = c(10, 0.01))"))
+                             param = c(1, 0.01))"))
   
   print(f)
   
   # Fit model
-  fit <- init_inla(f, data.stack = stk, family = family)$fit
+  fit <- init_inla(f, data = dat, family = family)$fit #data.stack = stk, 
   
   res <- list(f = f, fit = fit)
   return(res)
@@ -108,41 +119,41 @@ p_vgms_domain <- purrr::imap(fits.domain, function(x, nm) plot_vgm(x$fit$summary
                                                                   ylim = c(0.5,1)))
 
 # model     psill    range kappa
-# 1   Nug 0.7179050  0.00000   0.0
-# 2   Mat 0.1600005 21.48299   0.5
+# 1   Nug 0.7174815  0.00000   0.0
+# 2   Mat 0.1601273 21.44282   0.5
 # model     psill    range kappa
-# 1   Nug 0.7156381  0.00000   0.0
-# 2   Mat 0.1482520 20.83197   0.5
+# 1   Nug 0.7151361  0.00000   0.0
+# 2   Mat 0.1484297 20.78582   0.5
 # model     psill    range kappa
-# 1   Nug 0.6844554  0.00000   0.0
-# 2   Mat 0.1854343 20.17741   0.5
+# 1   Nug 0.6839024  0.00000   0.0
+# 2   Mat 0.1858052 20.16757   0.5
 # model     psill    range kappa
-# 1   Nug 0.6564771  0.00000   0.0
-# 2   Mat 0.1908631 18.72602   0.5
+# 1   Nug 0.6562865  0.00000   0.0
+# 2   Mat 0.1909908 18.69911   0.5
 # model     psill   range kappa
-# 1   Nug 0.6666980  0.0000   0.0
-# 2   Mat 0.1901168 18.9717   0.5
+# 1   Nug 0.6662924  0.0000   0.0
+# 2   Mat 0.1902892 18.9436   0.5
 
 # Compare travel time to diagnosis vs treatment
 plyr::llply(fits.domain, function(x) summary(x$fit))
 plyr::llply(fits.domain, function(x) x$fit$waic$waic) 
 # $Patient
-# [1] 28578.2
+# [1] 28573.9
 # 
 # $`Patient + detection`
-# [1] 28578.51
+# [1] 28574.22
 # 
 # $Awareness
-# [1] 28586.48
+# [1] 28581.63
 # 
 # $`Access: diag`
-# [1] 28585.52
+# [1] 28580.84
 # 
 # $`Access: trt`
-# [1] 28584.96
+# [1] 28580.26
 
 # Treatment facility travel time has a somewhat larger coefficient, but neither 
-# significant on 95%CrI
+# significant on 95% CrI
   
 # ---------------------------------------------------------------------------- #
 # Full multivariate fit
@@ -153,16 +164,16 @@ f <- as.formula(paste0("y ~ ",
                        paste0(covs_full, collapse = " + "), 
                        "+ f(id, model = 'iid',
                              prior = 'pc.prec', 
-                             param = c(10, 0.01))"))
+                             param = c(1, 0.01))"))
 
-fit.full <- init_inla(f, data.stack = stk, family = family)
+fit.full <- init_inla(f, data = dat, family = family)
 
 # saveRDS(fit.full, here::here(outdir, "fit_covs_multivar_nonspatial.rds"))
 
 p_vgm_full <- plot_vgm(fit.full$fit$summary.random$id$mean, dat, title = "Fitted IID effects: Full model", ylim = c(0.5,1))
 # model     psill    range kappa
-# 1   Nug 0.7238787  0.00000   0.0
-# 2   Mat 0.1316704 20.82969   0.5
+# 1   Nug 0.7232051  0.00000   0.0
+# 2   Mat 0.1319103 20.76699   0.5
 
 # ---------------------------------------------------------------------------- #
 # Compare univariate versus multivariate coefficients
@@ -170,7 +181,7 @@ p_vgm_full <- plot_vgm(fit.full$fit$summary.random$id$mean, dat, title = "Fitted
 fits.all <- rlist::list.append(c(fits.uni,
                                  setNames(fits.domain[-1], NULL)),
                                fit.full)
-rlist::list.save(fits.all, here::here(outdir, "fits_covs_full_nonspatial.rds"))
+# rlist::list.save(fits.all, here::here(outdir, "fits_covs_full_nonspatial.rds"))
 
 c("Intercept",
   "Age (std)",
@@ -220,23 +231,23 @@ dev.off()
 # ---------------------------------------------------------------------------- #
 # Multivariate fit with selection
 
-covs_select <- c("age_s","comorb1", "poss_acdTRUE",
-                 "block_endm_2017TRUE","inc_2017_gt0TRUE","traveltime_t_s") 
+covs_select <- c("age_s","comorb", "poss_acd",
+                 "block_endm_2017","inc_2017_gt0","traveltime_t_s") 
 
 f <- as.formula(paste0("y ~ ", 
                        paste0(covs_select, collapse = " + "), 
                        "+ f(id, model = 'iid',
                              prior = 'pc.prec', 
-                             param = c(10, 0.01))"))
+                             param = c(1, 0.01))"))
 
-fit.select <- init_inla(f, data.stack = stk, family = family)
+fit.select <- init_inla(f, data = dat, family = family)
 
 # saveRDS(fit.select, here::here(outdir, "fit_covs_multivar_select_nonspatial.rds"))
 
 p_vgm_select <- plot_vgm(fit.select$fit$summary.random$id$mean, dat, title = "Fitted IID effects: Full model with selection", ylim = c(0.5,1))
-# model     psill   range kappa
-# 1   Nug 0.7231392  0.0000   0.0
-# 2   Mat 0.1328259 20.0026   0.5
+# model     psill    range kappa
+# 1   Nug 0.7225837  0.00000   0.0
+# 2   Mat 0.1331138 19.94885   0.5
 
 png(here::here(figdir, "vgms_select_nonspatial.png"), height = 1000, width = 500)
 gridExtra::grid.arrange(p_vgm_null, p_vgm_select, nrow = 2)

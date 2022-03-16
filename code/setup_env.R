@@ -6,6 +6,7 @@
 # Dev version of ggmap
 # install.packages("remotes")
 # remotes::install_github("inbo/inlatools")
+# remotes::install_github("finnlindgren/excursions")
 # devtools::install_github("dkahle/ggmap", force = TRUE)
 # devtools::install_github('joenomiddlename/PStestR', dependencies=T, build_vignettes=T)
 # remotes::install_github("gfalbery/ggregplot")
@@ -17,9 +18,9 @@ options(collapse_mask = "manip")
 library(collapse)
 
 # Packages required
-packages <- c("here","tidyverse","lubridate", "magrittr", "gridExtra","sf","spdep","rgdal",
+packages <- c("here","tidyverse","lubridate", "magrittr","gridExtra","sf","spdep","rgdal",
               "spatstat","ggspatial","ggmap","patchwork","scales","here", "gstat", 
-              "variosig", "biscale","INLA","inlabru", "inlatools", "ggregplot","mapr",
+              "variosig", "biscale","INLA","inlabru", "inlatools", "excursions", "ggregplot","mapr",
               "INLAutils","brinla","rlist") 
 
 # Check and install if necessary

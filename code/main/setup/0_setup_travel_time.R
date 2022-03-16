@@ -40,11 +40,12 @@ facility <- read.csv(here::here("data","covariates",
   tidyr::separate(Coordinates, into = c("y", "x"), sep = ",", convert = TRUE) %>%
   dplyr::mutate(diag = toupper(Diagnosis.Facility.Available),
                 trt = toupper(LAmB.Treatment.Available),
-                Capacity = as.factor(
+                Capacity = factor(
                   case_when(diag == "YES" & trt == "NO"~ "Diagnosis",
-                            trt == "YES" & diag == "NO" ~ "LAmB Treatment",
-                            diag == "YES" & trt == "YES" ~ "Diagnosis + treatment",
-                            TRUE ~ "None")))
+                            trt == "YES" & diag == "NO" ~ "Treatment",
+                            diag == "YES" & trt == "YES" ~ "Diagnosis + Treatment",
+                            TRUE ~ "None"),
+                  levels = c("None","Diagnosis","Treatment","Diagnosis + Treatment"))) 
 
 sp::coordinates(facility) <- ~ x + y
 sp::proj4string(facility) <- sp::proj4string(bh.shp)
@@ -59,11 +60,15 @@ facility <- facility[!is.na(overlap),]
 ggplot() +
   geom_sf(data = st_as_sf(bh.shp), aes(geometry = geometry), fill = "white") +
   geom_sf(data = st_as_sf(facility), aes(geometry = geometry, col = Capacity)) +
-  labs(title = "Health facilities with VL capacity in endemic districts of Bihar") +
+  # labs(title = "Health facilities with VL capacity in endemic districts of Bihar") +
+  scale_colour_viridis_d(option = "plasma", begin = 0, end= 0.8, direction = -1) + 
+  theme_minimal() +
   theme(axis.title = element_blank(),
         axis.text = element_blank(),
-        panel.grid = element_blank()) -> map_facilities
+        panel.grid = element_blank(),
+        legend.position = c(0.85, 0.85)) -> map_facilities
 
+map_facilities
 ggsave(here::here("figures","covariates","facilities.png"), map_facilities, height = 5, width = 7, units = "in")
 
 # Extract only those with diagnosis/treatment capacity
