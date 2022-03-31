@@ -8,11 +8,11 @@ agg_pred_df <- function(pred.df, by){
                        p_acd = mean(detection == "ACD")*100,
                        fitted_delay_tot = sum(fitted),
                        pred_delay_tot = sum(pred),
-                       days_saved_tot = fitted_delay_tot - pred_delay_tot,
-                       days_saved_perc = (fitted_delay_tot - pred_delay_tot)*100/fitted_delay_tot,
-                       days_saved_percase = (fitted_delay_tot - pred_delay_tot)/n_cases,
-                       days_saved_perPCDcase = na_if(na_if((fitted_delay_tot - pred_delay_tot)/(n_cases - n_acd), Inf), -Inf),
-                       days_saved_perACDcase = na_if(na_if((fitted_delay_tot - pred_delay_tot)/n_acd, Inf), -Inf)) -> agg
+                       chg_tot = pred_delay_tot - fitted_delay_tot,
+                       chg_perc = chg_tot*100/fitted_delay_tot,
+                       chg_percase = chg_tot/n_cases,
+                       chg_perPCDcase = na_if(na_if(chg_tot/(n_cases - n_acd), Inf), -Inf),
+                       chg_perACDcase = na_if(na_if(chg_tot/n_acd, Inf), -Inf)) -> agg
     
   }else if (by == "endemic"){
     pred.df %>%  
@@ -22,11 +22,11 @@ agg_pred_df <- function(pred.df, by){
                        p_acd = mean(detection == "ACD")*100,
                        fitted_delay_tot = sum(fitted),
                        pred_delay_tot = sum(pred),
-                       days_saved_tot = fitted_delay_tot - pred_delay_tot,
-                       days_saved_perc = (fitted_delay_tot - pred_delay_tot)*100/fitted_delay_tot,
-                       days_saved_percase = (fitted_delay_tot - pred_delay_tot)/n_cases,
-                       days_saved_perPCDcase = na_if(na_if((fitted_delay_tot - pred_delay_tot)/(n_cases - n_acd), Inf), -Inf),
-                       days_saved_perACDcase = na_if(na_if((fitted_delay_tot - pred_delay_tot)/n_acd, Inf), -Inf)) -> agg
+                       chg_tot = pred_delay_tot - fitted_delay_tot,
+                       chg_perc = chg_tot*100/fitted_delay_tot,
+                       chg_percase = chg_tot/n_cases,
+                       chg_perPCDcase = na_if(na_if(chg_tot/(n_cases - n_acd), Inf), -Inf),
+                       chg_perACDcase = na_if(na_if(chg_tot/n_acd, Inf), -Inf)) -> agg
     
   } 
   

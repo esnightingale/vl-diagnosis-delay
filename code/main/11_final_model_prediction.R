@@ -14,7 +14,6 @@ mesh <- readRDS(here::here("data/analysis","mesh.rds"))
 spde <- readRDS(here::here("data/analysis","spde.rds"))
 dat <- read_data()  
 coop <- readRDS(here::here("data/analysis","coop.rds"))
-stk <- readRDS(here::here("data/analysis","stack.rds")) 
 
 covs <- c("age_s","comorb", 
           "poss_acd",
@@ -281,20 +280,26 @@ excursions30 <- excursions.inla(
   u.link = TRUE,
   type = ">",
   n.iter = 10000,
+  F.limit = 0,
   verbose = 1,
   seed = 1234
 )
+saveRDS(excursions30, here::here("output","excursions.rds"))
+
+summary(excursions30)
 
 #Define a fine mesh over region of interest
-
-submesh = submesh.grid(...)
+coo.bnd <- st_coordinates(boundary)[,1:2]
+nxy <- c(100, 100)
+projgrid <- inla.mesh.projector(mesh, xlim = range(coo.bnd[, 1]), ylim = range(coo.bnd[,2]), dims = nxy)
+xy.in <- inout(projgrid$lattice$loc, cbind(coo.bnd[, 1], coo.bnd[, 2]))
+submesh <- submesh.grid(matrix(xy.in, nxy[1], nxy[2]), list(loc = projgrid$lattice$loc,
+                                                            dims = nxy))
 
 #Interpolate excursion set to the mesh
-
-sets <- continuous(excursions30, mesh, alpha = 0.1)
+sets <- continuous(excursions30, submesh, alpha = 0.1)
 
 #Plot excursion set
-
 plot(sets$M["1"], col = "red")
 
 #plot excursion function
@@ -318,35 +323,77 @@ index.p2 <- inla.stack.index(stack = stk, tag = "pred_noACD")$data
 pred_fullACD <- summarise_pred(index.p1)
 pred_noACD <- summarise_pred(index.p2)
 
-write.csv(pred_fullACD$tab, here::here("output","tab_fullACD.csv"))
-write.csv(pred_noACD$tab, here::here("output","tab_noACD.csv"))
+write.csv(pred_fullACD$tab, here::here("output","tables","tab_fullACD.csv"))
+write.csv(pred_noACD$tab, here::here("output","tables","tab_noACD.csv"))
 
-saveRDS(list(fullACD = pred_fullACD, noACD = pred_noACD), here::here(outdir, "summary_fullACD_noACD.rds"))
+saveRDS(list(fullACD = pred_fullACD, noACD = pred_noACD), 
+        here::here(outdir, "summary_fullACD_noACD.rds"))
 
 pred_fullACD$endm %>%
-  separate(saved.ci, ", ", into = c("low","high"), convert = TRUE) %>%
-  ggplot(aes(x = block_endm_2017, y = saved, ymin = low, ymax = high)) +
+  separate(chg.ci, ", ", into = c("low","high"), convert = TRUE) %>%
+  ggplot(aes(x = block_endm_2017, y = chg, ymin = low, ymax = high)) +
     geom_errorbar(width = 0.2) +
     geom_point() +
-    labs(x = "", y = "Days delay saved, total") -> saved_tot
+    labs(x = "", y = "Change in delay (days), total") -> change_tot
 
 pred_fullACD$endm %>%
-  separate(saved.pc.ci, ", ", into = c("low","high"), convert = TRUE) %>%
-  ggplot(aes(x = block_endm_2017, y = saved.pc, ymin = low, ymax = high)) +  
+  separate(chg.pc.ci, ", ", into = c("low","high"), convert = TRUE) %>%
+  ggplot(aes(x = block_endm_2017, y = chg.pc, ymin = low, ymax = high)) +  
   geom_errorbar(width = 0.2) +
   geom_point() +
   ylim(c(0,12))+
-  labs(x = "", y = "Days delay saved, per case") -> saved_pc
+  labs(x = "", y = "Change in delay (days), per case") -> change_pc
 
 pred_fullACD$endm %>%
-  separate(saved.pc.PCD.ci, ", ", into = c("low","high"), convert = TRUE) %>%
-  ggplot(aes(x = block_endm_2017, y = saved.pc.PCD, ymin = low, ymax = high)) +
+  separate(chg.pc.PCD.ci, ", ", into = c("low","high"), convert = TRUE) %>% View()
+  ggplot(aes(x = block_endm_2017, y = chg.pc.PCD, ymin = low, ymax = high)) +
   geom_errorbar(width = 0.2) +
   geom_point()+
   ylim(c(0,12)) +
-  labs(x = "", y = "Days delay saved, per PCD case") -> saved_pPCD
+  labs(x = "", y = "Change in delay (days), per PCD case") -> change_pPCD
 
-ggsave(here::here(figdir, "pred_days_saved_fullACD.png"), grid.arrange(saved_tot, saved_pc, saved_pPCD, nrow = 1), height = 4, width = 12)
+ggsave(here::here(figdir, "pred_days_change_fullACD.png"), grid.arrange(change_tot, change_pc, change_pPCD, nrow = 1), height = 4, width = 12)
+
+pred_fullACD$endm %>%
+  separate(chg.pc.ci, ", ", into = c("low","high"), convert = TRUE) %>%
+  mutate(scenario = "100% ACD coverage",
+         estimate = chg.pc,
+         measure = "per case") %>% 
+  dplyr::select(scenario, block_endm_2017, measure, estimate, low, high) -> plotdata1
+pred_fullACD$endm %>%
+  separate(chg.pc.PCD.ci, ", ", into = c("low","high"), convert = TRUE) %>%
+  mutate(scenario = "100% ACD coverage",
+         estimate = chg.pc.PCD,
+         measure = "per reassigned case") %>% 
+  bind_rows(plotdata1)  %>% 
+  dplyr::select(scenario, block_endm_2017, measure, estimate, low, high) -> plotdata1
+
+pred_noACD$endm %>%
+  separate(chg.pc.ci, ", ", into = c("low","high"), convert = TRUE) %>%
+  mutate(scenario = "0% ACD coverage",
+         estimate = chg.pc,
+         measure = "per case")  %>% 
+  dplyr::select(scenario, block_endm_2017, measure, estimate, low, high) -> plotdata2
+pred_noACD$endm %>%
+  separate(chg.pc.ACD.ci, ", ", into = c("low","high"), convert = TRUE) %>%
+  mutate(scenario = "0% ACD coverage",
+         estimate = chg.pc.ACD,
+         measure = "per reassigned case") %>% 
+  dplyr::select(scenario, block_endm_2017, measure, estimate, low, high) %>% 
+  bind_rows(plotdata2) %>% 
+  bind_rows(plotdata1) -> plotdata
+
+dodge <- position_dodge(width=0.5)  
+plotdata %>% 
+  ggplot(aes(x = block_endm_2017, y = estimate, ymin = low, ymax = high, lty = measure, colour = scenario)) +  
+  geom_errorbar(width = 0.2, position = dodge) +
+  geom_point(position = dodge) +
+  geom_hline(yintercept = 0, col = "grey") +
+  # theme(legend.position = c(0.8,0.95)) +
+  labs(x = "", y = "Average change in expected delay (days)", colour = "", lty = "") -> days_change
+days_change
+
+ggsave(here::here(figdir, "days_change_ACDcovg.png"), days_change, height = 5, width = 7, dpi = 300)
 
 # ---------------------------------------------------------------------------- #
 # ---------------------------------------------------------------------------- #
