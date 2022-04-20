@@ -5,6 +5,8 @@
 ################################################################################
 ################################################################################
 
+set.seed(101)
+
 source(here::here("code","setup_env.R"))
 
 figdir <- "figures/fit"
@@ -37,56 +39,62 @@ covs <- c("age_s","comorb", "poss_acd",
           "traveltime_t_s")
 
 # Number of iterations
-M = 10
+M = 50
 
-# Percentage withheld for testing
-type = "nonspatial"
-test_prop = 0.1
+# Sample M test points
+test.indices <- sample(1:nrow(data), size = M)
 
-# Radius of exclusion - 20km
-# type = "spatial"
-# r = 10
+# Exclusion radius for spatial
+r = 50
 
 # Exceedance cutoff
 C = 30
 
+for (type in c("nonspatial", "spatial")){
+
 # Initialise output - list of data frames which will be different sizes for each
 # randomly generated test set
 preds_all <- lapply(1:length(fits), function(x) data.frame())
+n_witheld <- rep(NA, M)
+
+# pdf(here::here(outdir, paste0(type,"_witheld_points.pdf")), height = 4, width = 6)
 
 #------------------------------------------------------------------------------#
 
 # M iterations 
   
 for (m in 1:M){
+  
+  test.index <- test.indices[m]
  
     if (type == "spatial"){
-      
-      # Randomly sample one starting location
-      samp <- sample_n(data, 1)
-      
+ 
       # Define buffer of radius r around sampled observation
-      buff <- st_buffer(samp, dist = r)
-      
+      buff <- st_buffer(data[test.index,], dist = r)
+
       # Intersect full dataset with buffer
-      test.index <- st_intersects(data, buff, sparse = FALSE)
+      withold <- st_intersects(data, buff, sparse = FALSE)
+      print(paste0(sum(withold == TRUE), " observations excluded"))
       
+      n_witheld[m] <- sum(withold == TRUE)
+
+      # ggplot() +
+      #   geom_sf(data = boundary, aes(geometry = geometry)) +
+      #   geom_sf(data = data[!withold,], aes(geometry = geometry), col = "black", cex = 0.7) +
+      #   geom_sf(data = data[withold,], aes(geometry = geometry), col = "red", cex = 0.7) +
+      #   geom_sf(data = data[test.index,], aes(geometry = geometry), col = "green")
+    
     }else if (type == "nonspatial"){
       
-      # Randomly sample X% of observations
-      test.index <- sample(c(TRUE,FALSE), size = nrow(data), prob = c(test_prop, 1-test_prop), replace = TRUE)
-
-    }
+      withold <- rep(FALSE, nrow(data))
+      withold[test.index] <- TRUE
       
-    print(summary(test.index))
+    }
   
-    dat.train <- data[!test.index,]
+    dat.train <- data[!withold,]
     dat.test <- data[test.index,]
     obs.test <- data$delay[test.index]
-    
-    print(summary(dat.train))
-    print(summary(dat.test))
-    
+
     #--------------------------------------------------------------------------#
     # DEFINE DATA STACK
   
@@ -100,7 +108,7 @@ for (m in 1:M){
     # Define model matrix based on all covariates of interest, removing automatic 
     # intercept
     X1 <- model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))), 
-                       data = dat.train)[,-1] 
+                       data = dat.train)[,-1]
     
     # Training stack
     stk.train <- inla.stack(
@@ -117,11 +125,9 @@ for (m in 1:M){
       coot <- st_coordinates(dat.test)
       At <- inla.spde.make.A(mesh = mesh, loc = coot)
       
-      dim(At)
-      nrow(dat.test)
-      
-      X2 <- model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))), 
-                         data = dat.test)[,-1] 
+      # Single vector so transpose to match dims
+      X2 <- t(model.matrix(as.formula(paste("~ ",paste(covs, collapse = " + "))), 
+                         data = dat.test)[,-1]) 
       
       # Testing stack
       stk.test <- inla.stack(
@@ -185,9 +191,11 @@ for (m in 1:M){
     
     preds_all[[i]] <- bind_rows(preds_all[[i]],temp)
   
-  }
-  
+    }
+      
 }
+
+# dev.off()
 
 names(preds_all) <- names(fits)
 # saveRDS(preds_all, here::here(outdir, paste0(type, "_cv_preds.rds")))
@@ -199,27 +207,34 @@ cv_summ <- data.frame(Model = names(preds_all),
                       logs.cv = sapply(preds_all, function(x) -log(mean(x$cpo))),
                       brier.cv = sapply(preds_all, function(x) mean((x$exc.prob - as.numeric(x$exc.obs))^2)))
 
-cv.out <- list(preds = preds_all, summary = cv_summ)
+cv.out <- list(preds = preds_all, summary = cv_summ, n_witheld = n_witheld)
 saveRDS(cv.out, here::here(outdir, paste0(type, "_cv_out.rds")))
 
-mod_compare <- read.csv(here::here("output","mod_compare.csv")) 
-tab_random_mav <- read.csv(here::here("output","tab_random_mav_refnull.csv"))
+mod_compare <- read.csv(here::here("output","tables","mod_compare.csv")) 
+tab_random_mav <- read.csv(here::here("output","tables","tab_random_mav_refnull.csv"))
 
 mod_compare <- full_join(mod_compare, tab_random_mav, by = "Model") %>%
-  full_join(cv_summ)
+  full_join(cv_summ) %>%
+  filter(Model %in% c("Null","All (IID only)","None","All")) %>% 
+  mutate(Model.no = c(1, 3, 4, 2),
+         dWAIC = WAIC - min(WAIC)) %>% 
+  dplyr::select(Model.no, Model, WAIC, dWAIC, MSE, brier, MSE.cv, brier.cv, logs.cv) %>% 
+  arrange(Model.no)
 
 write.csv(mod_compare, here::here(outdir,paste0(type, "_mod_compare_full.csv")), row.names = FALSE)
 
 # ---------------------------------------------------------------------------- #
 # Plot CV predictions against observed
 
-pdf(here::here(figdir,paste0(type, "_obs_vs_cvpred.pdf")), height = 7, width = 8)
+pdf(here::here(outdir,paste0(type, "_obs_vs_cvpred.pdf")), height = 7, width = 8)
 purrr::imap(preds_all, function(x, nm) plot_preds(x, name = nm))
 dev.off()
 
-pdf(here::here(figdir,paste0(type, "_obs_vs_cvpred_exc30.pdf")), height = 7, width = 8)
+pdf(here::here(outdir,paste0(type, "_obs_vs_cvpred_exc30.pdf")), height = 7, width = 8)
 purrr::imap(preds_all, function(x, nm) plot_exc(x, name = nm))
 dev.off()
+
+}
 
 ################################################################################
 ################################################################################
