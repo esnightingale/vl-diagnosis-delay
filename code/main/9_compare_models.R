@@ -68,6 +68,29 @@ dev.off()
 #------------------------------------------------------------------------------#
 # Precision of IID effects and spatial range/SD
 
+models <- list(Null = fits$Null$fit,
+               `All (IID only)`= fits$`All (IID only)`$fit,
+               All = fits$All$fit)
+
+get_marg_sd <- function(m){
+  inla.tmarginal(function(tau) tau^(-1/2),
+                             m$marginals.hyperpar[["Precision for id"]])
+}
+
+marg_sds <- lapply(models, get_marg_sd)
+lapply(marg_sds, function(m) as.data.frame(inla.zmarginal(m)))
+# $Null
+#      mean         sd quant0.025 quant0.25  quant0.5 quant0.75 quant0.975
+# 0.9903017 0.01178661   0.967391 0.9822588 0.9902583  0.998112   1.014144
+# 
+# $`All (IID only)`
+#      mean         sd quant0.025 quant0.25  quant0.5 quant0.75 quant0.975
+# 0.9637333 0.01155997  0.9413518 0.9558684 0.9636038 0.9713422  0.9872303
+# 
+# $All
+#      mean         sd quant0.025 quant0.25  quant0.5 quant0.75 quant0.975
+# 0.9266144 0.01239389  0.9041109 0.9178879 0.9258607  0.934689  0.9526099
+
 fits$Null$fit$summary.hyperpar
 #                      mean         sd 0.025quant 0.5quant 0.975quant     mode
 # Precision for id 1.020131 0.02418332  0.9724507 1.019738   1.068401 1.017056
@@ -144,45 +167,59 @@ c("Intercept",
   # "Travel time*rainy season"
   ) -> axis.labs
 
-png(here::here(figdir, "fitted_effects_main.png"), height = 6, width = 8, unit = "in", res = 320)
-Efxplot(lapply(fits[c(10, 11, 9)], function(x) x$fit),
-        ModelNames = c("Fixed effects only","Non-spatial random effects","Spatial random effects"),
+png(here::here(figdir, "fitted_effects_main_fig3.png"), height = 6, width = 8, unit = "in", res = 320)
+Efxplot(lapply(fits[c(11, 9)], function(x) x$fit),
+        ModelNames = c("Non-spatial","Spatial"), #"Fixed effects only",
         Intercept = FALSE,
         exp = TRUE,
         # VarOrder= rev(order),
         VarNames = rev(axis.labs)) +
   scale_colour_viridis_d(option = "plasma", begin = 0.2, end = 0.8, direction = 1) +
   theme(legend.position = c(0.75,0.2),
-        legend.title = element_blank(),
+        # legend.title = element_blank(),
         legend.box.background = element_rect(color="white", size=2))
 # theme(legend.position = c(0.8,0.2))
 dev.off()
 
 
 png(here::here(figdir, "fitted_effects_supp1.png"), height = 6, width = 8, unit = "in", res = 320)
-Efxplot(lapply(fits[3:9], function(x) x$fit),
-                   ModelNames = names(fits)[3:9],
-                   Intercept = FALSE,
-                   exp = TRUE,
-                   VarNames = rev(axis.labs)) +
-  scale_colour_viridis_d(option = "plasma", end = 0.8, direction = -1) +
-  theme(legend.position = c(0.8,0.25),
-        legend.title = element_blank(),
+Efxplot(lapply(fits[c(10, 11, 9)], function(x) x$fit),
+        ModelNames = c("Fixed effects only", "Non-spatial","Spatial"), 
+        Intercept = FALSE,
+        exp = TRUE,
+        # VarOrder= rev(order),
+        VarNames = rev(axis.labs)) +
+  scale_colour_viridis_d(option = "plasma", begin = 0.2, end = 0.8, direction = 1) +
+  theme(legend.position = c(0.75,0.2),
+        # legend.title = element_blank(),
         legend.box.background = element_rect(color="white", size=2))
+# theme(legend.position = c(0.8,0.2))
 dev.off()
 
 png(here::here(figdir, "fitted_effects_supp2.png"), height = 6, width = 8, unit = "in", res = 320)
-Efxplot(lapply(fits[c(11,9,13)], function(x) x$fit),
-                   ModelNames = c("Non-spatial (IID)", "Spatial (IID+SPDE)","Spatial (Binomial likelihood)"),
+Efxplot(lapply(fits[c(9,13)], function(x) x$fit),
+                   ModelNames = c("Spatial","Spatial (Binomial likelihood)"),
                    Intercept = FALSE,
                    exp = TRUE,
                    # VarOrder= rev(order),
                    VarNames = rev(axis.labs)) +
   scale_colour_viridis_d(option = "plasma", begin = 0.2, end = 0.8, direction = 1) +
   theme(legend.position = c(0.75,0.2),
-        legend.title = element_blank(),
+        # legend.title = element_blank(),
         legend.box.background = element_rect(color="white", size=2))
   # theme(legend.position = c(0.8,0.2))
+dev.off()
+
+png(here::here(figdir, "fitted_effects_supp3.png"), height = 6, width = 8, unit = "in", res = 320)
+Efxplot(lapply(fits[3:9], function(x) x$fit),
+        ModelNames = names(fits)[3:9],
+        Intercept = FALSE,
+        exp = TRUE,
+        VarNames = rev(axis.labs)) +
+  scale_colour_viridis_d(option = "plasma", end = 0.8, direction = -1) +
+  theme(legend.position = c(0.8,0.25),
+        legend.title = element_blank(),
+        legend.box.background = element_rect(color="white", size=2))
 dev.off()
 
 #------------------------------------------------------------------------------#

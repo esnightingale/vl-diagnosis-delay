@@ -32,7 +32,6 @@ blockmap <- readRDS(here::here("data","geography","blockmap.rds")) %>%
 by_block <- readRDS(here::here("data","geography","by_block.rds"))
 
 fit.final <- readRDS(here::here(outdir, "fits_final.rds"))[["All"]]
-# fit.final <- fits[["All"]]
 
 #------------------------------------------------------------------------------#
 # Final model summary
