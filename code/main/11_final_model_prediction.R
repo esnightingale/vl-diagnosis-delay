@@ -230,14 +230,16 @@ ggsave(here::here(figdir,"pred_QR_mean.png"), height = 6, width = 8, units = "in
 #------------------------------------------------------------------------------#
 # Exceedance probabilities
 
+cutoff <- 0.5
+
 # Extract fitted marginals
 # Calculate probability of exceeding 30 days from this marginal distribution
 pred$excprob <- sapply(fit.pred$marginals.fitted.values[index.p],
                        FUN = function(marg){1 - inla.pmarginal(q = 30, marginal = marg)})
 pred <- mutate(pred, 
-               excprob_hi = case_when(excprob > 0.5 ~ "greater than 0.5",
-                                     excprob <= 0.5 ~ "less/equal to 0.5"),
-               excprob_strength = abs(excprob - 0.5))
+               excprob_hi = case_when(excprob > cutoff ~ paste0("greater than ", cutoff),
+                                     excprob <= cutoff ~ paste0("less/equal to ", cutoff)),
+               excprob_strength = abs(excprob - cutoff))
 
 ggplot() +
   geom_tile(data = pred, aes(x = x, y = y, fill = excprob)) +

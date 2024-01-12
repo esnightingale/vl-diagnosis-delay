@@ -29,6 +29,11 @@ Efxplot <- function (ModelList, ModelGroups = NULL, Sig = TRUE, StarLoc = NULL, 
       colnames(Graph)[1:3] <- c("Estimate", "Lower", 
                                 "Upper")
     }
+    if (class(model) == "brmsfit") {
+      Graph <- as.data.frame(summary(model)$solutions)
+      colnames(Graph)[1:3] <- c("Estimate", "Lower", 
+                                "Upper")
+    }
     if (any(class(model) %>% str_detect("bam|gam"))) {
       Graph <- summary(model)[1:4] %>% map(~.x[1:length(summary(model)[[1]])]) %>% 
         bind_cols() %>% rename(Estimate = p.coeff, P = p.pv) %>% 

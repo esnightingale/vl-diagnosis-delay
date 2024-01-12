@@ -44,7 +44,7 @@ dat %>%
   geom_histogram(bins = 50) +
   xlim(c(0,250)) +
   geom_vline(xintercept = 14, lty = "dashed") +
-  annotate("text", x = 200, y = 300, size = 2, 
+  annotate("text", x = 150, y = 500, size = 5, 
            label = paste0("N = 24", #Axis cut at 365 days\n
                           # sum(dat$days_fever < 14),
                           " cases with < 14 days fever before diagnosis\nN = ",
@@ -52,12 +52,13 @@ dat %>%
                           " cases with > 250 days"
                           )) +
   # facet_wrap(~diag_year) +
-  labs(x = "Onset to diagnosis (days)", y = "Frequency") -> days_fever_hist
+  labs(x = "Onset to diagnosis (days)", y = "Frequency") +
+  theme(text = element_text(size = 20)) -> days_fever_hist
 days_fever_hist
 
 ggsave(here::here(figdir,"days_fever_hist.png"),
        days_fever_hist,
-       height = 4, width = 5, units = "in")
+       height = 5, width = 8, units = "in")
 
 plot_vgm(dat$delay, dat, title = "Observed delay")
 #   model    psill    range kappa
@@ -100,7 +101,10 @@ by_mth %>%
   ggplot(aes(x = diag_month, y = value, fill = Delay)) +
   geom_col() +
   scale_fill_manual(values = pal) +
-  labs(x = "Month of diagnosis", y = "Proportion", fill = "Excess delay") -> prop_excessive
+  labs(x = "Month of diagnosis", y = "Proportion", fill = "Excess delay") +
+  theme(text = element_text(size = 20),
+        legend.position = c(0.75,0.75),
+        legend.background = element_rect(fill = "white", colour = "black")) -> prop_excessive
 prop_excessive
 
 ggsave(here::here(figdir,"prop_excessive_bymth.png"),
@@ -119,8 +123,9 @@ ggplot() +
   scale_colour_viridis_d(direction = -1, end = 0.9) + #trans = "log2"
   labs(col = "Delay (days)") + 
   theme(axis.text = element_blank(), panel.grid = element_blank(),
-        legend.position = c(0.9,0.85)) 
-
+        legend.position = c(0.85,0.9),
+        text = element_text(size = 20)) -> delay_gps_blk
+delay_gps_blk
 ggsave(here::here("figures/descriptive/fig1_block.png"), height = 6, width = 8, units = "in")
 
 ggplot() +
@@ -129,7 +134,9 @@ ggplot() +
   scale_colour_viridis_d(direction = -1, end = 0.9) + #trans = "log2"
   labs(col = "Delay (days)") + 
   theme(axis.text = element_blank(), panel.grid = element_blank(),
-        legend.position = c(0.9,0.85)) 
+        legend.position = c(0.85,0.9),
+        text = element_text(size = 20)) -> delay_gps
+delay_gps
 # +
 #   annotation_scale(location = "br") +
 #   annotation_north_arrow(location = "tr", pad_x = unit(2, "cm"), pad_y = unit(1, "cm"))
@@ -226,7 +233,8 @@ ggplot() +
   scale_fill_viridis_c(option = "plasma", na.value = "white", direction = 1, trans = "log10", end = 0.9) +
   labs(fill = "Incidence\nper 10,000") + 
   theme(axis.text = element_blank(), panel.grid = element_blank(),
-        legend.position = c(0.9,0.85)) -> blk_inc
+        legend.position = c(0.8,0.9),
+        text = element_text(size = 20)) -> blk_inc
 blk_inc
 
 saveRDS(by_block, here::here("data","geography","by_block.rds"))
@@ -239,7 +247,8 @@ ggplot() +
   scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, trans = "sqrt", end = 0.9) +
   labs(fill = "Median delay") + 
   theme(axis.text = element_blank(), panel.grid = element_blank(),
-        legend.position = c(0.9,0.85)) -> blk_med_delay
+        legend.position = c(0.9,0.85),
+        text = element_text(size = 20)) -> blk_med_delay
 blk_med_delay
 
 ggsave(here::here(figdir, "block_med_delay.png"), blk_med_delay, height = 6, width = 8, units = "in")
@@ -250,7 +259,8 @@ ggplot() +
   scale_fill_viridis_c(option = "viridis", na.value = "white", direction = -1, end = 0.9) +
   labs(fill = "% > 30 days") + 
   theme(axis.text = element_blank(), panel.grid = element_blank(),
-        legend.position = c(0.9,0.85)) -> blk_pgt30
+        legend.position = c(0.85,0.9),
+        text = element_text(size = 20)) -> blk_pgt30
 blk_pgt30
 
 ggsave(here::here(figdir, "block_propgt30.png"), blk_pgt30, height = 6, width = 8, units = "in")
@@ -359,6 +369,16 @@ vgfit
 png(here::here(figdir, "delay_semivariogram.png"), height = 500, width = 600)
 plot(vg, model = vgfit, xlab = "Distance (km)")
 dev.off()
+
+# ---------------------------------------------------------------------------- #
+# Combined figure for publication
+
+(days_fever_hist + prop_excessive) / (delay_gps_blk + blk_pgt30) +
+  plot_annotation(tag_levels = "A") & theme(plot.tag = element_text(size = 28)) -> fig1
+fig1
+
+ggsave(here::here("figures", "publication", "fig1_.png"), fig1,
+       height = 800, width = 900, units = "px", dpi = 320)
 
 # ---------------------------------------------------------------------------- #
 # Tabulate

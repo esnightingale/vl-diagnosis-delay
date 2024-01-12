@@ -33,6 +33,9 @@ invisible(lapply(packages, library, character.only = TRUE))
 
 # ggmap::register_google(key = "AIzaSyDBz7TtWW69ZGDHmThLgSzEuVEXrEt8pEQ", write = TRUE)
 
+# Fix default ggsave background
+ggsave <- function(..., bg = 'white') ggplot2::ggsave(..., bg = bg)
+
 # Set default theme for plotting
 theme_set(theme_minimal())
 

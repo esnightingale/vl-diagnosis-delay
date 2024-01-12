@@ -108,11 +108,11 @@ fits$All$fit$summary.hyperpar
 #------------------------------------------------------------------------------#
 # Spatial correlation in fitted IID effects
 
-p_vgm_null <- plot_vgm(fits$Null$fit$summary.random$id$mean, dat, title = "Null model",ylim = c(0.5,1))
+p_vgm_null <- plot_vgm(fits$Null$fit$summary.random$id$mean, dat, title = "Non-spatial, no covariates [Baseline]",ylim = c(0.5,1))
 
-p_vgm_select <- plot_vgm(fits$`All (IID only)`$fit$summary.random$id$mean, dat, title = "Selected covariates, non-spatial model",ylim = c(0.5,1))
+p_vgm_select <- plot_vgm(fits$`All (IID only)`$fit$summary.random$id$mean, dat, title = "Non-spatial, selected covariates",ylim = c(0.5,1))
 
-p_vgm_final <- plot_vgm(fits$All$fit$summary.random$id$mean, dat, title = "Selected covariates, spatial model",ylim = c(0.5,1))
+p_vgm_final <- plot_vgm(fits$All$fit$summary.random$id$mean, dat, title = "Spatial, selected covariates",ylim = c(0.5,1))
 
 png(here::here(figdir, "vgms_null_select_final.png"), height = 500, width = 1500)
 gridExtra::grid.arrange(p_vgm_null, p_vgm_select, p_vgm_final, nrow = 1)
@@ -167,7 +167,7 @@ c("Intercept",
   # "Travel time*rainy season"
   ) -> axis.labs
 
-png(here::here(figdir, "fitted_effects_main_fig3.png"), height = 6, width = 8, unit = "in", res = 320)
+png(here::here(figdir, "fitted_effects_main.png"), height = 6, width = 8, unit = "in", res = 320)
 Efxplot(lapply(fits[c(11, 9)], function(x) x$fit),
         ModelNames = c("Non-spatial","Spatial"), #"Fixed effects only",
         Intercept = FALSE,
@@ -175,6 +175,7 @@ Efxplot(lapply(fits[c(11, 9)], function(x) x$fit),
         # VarOrder= rev(order),
         VarNames = rev(axis.labs)) +
   scale_colour_viridis_d(option = "plasma", begin = 0.2, end = 0.8, direction = 1) +
+  labs(x = "Log Risk Ratio") +
   theme(legend.position = c(0.75,0.2),
         # legend.title = element_blank(),
         legend.box.background = element_rect(color="white", size=2))
@@ -184,21 +185,23 @@ dev.off()
 
 png(here::here(figdir, "fitted_effects_supp1.png"), height = 6, width = 8, unit = "in", res = 320)
 Efxplot(lapply(fits[c(10, 11, 9)], function(x) x$fit),
-        ModelNames = c("Fixed effects only", "Non-spatial","Spatial"), 
+        ModelNames = c("Fixed effects only", "Non-spatial, all covariates","Spatial, all covariates"), 
         Intercept = FALSE,
         exp = TRUE,
         # VarOrder= rev(order),
         VarNames = rev(axis.labs)) +
   scale_colour_viridis_d(option = "plasma", begin = 0.2, end = 0.8, direction = 1) +
+  labs(x = "Risk Ratio") +
   theme(legend.position = c(0.75,0.2),
         # legend.title = element_blank(),
-        legend.box.background = element_rect(color="white", size=2))
+        legend.box.background = element_rect(color="white", size=2)) +
+  labs(x = NULL, y = "Risk Ratio")
 # theme(legend.position = c(0.8,0.2))
 dev.off()
 
 png(here::here(figdir, "fitted_effects_supp2.png"), height = 6, width = 8, unit = "in", res = 320)
 Efxplot(lapply(fits[c(9,13)], function(x) x$fit),
-                   ModelNames = c("Spatial","Spatial (Binomial likelihood)"),
+                   ModelNames = c("Poisson likelihood (RR)","Binomial likelihood (OR)"),
                    Intercept = FALSE,
                    exp = TRUE,
                    # VarOrder= rev(order),
